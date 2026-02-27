@@ -1,0 +1,9 @@
+apiVersion: v2
+name: creatium-service
+description: Shared Helm chart for all Creatium microservices
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Vidit Bhatia
+    email: vidit@creatium.com

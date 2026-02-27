@@ -1,0 +1,57 @@
+# agent-backend — Python/FastAPI service
+nameOverride: agent-backend
+
+image:
+  repository: ghcr.io/creatium/agent-backend
+  tag: "latest"
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.creatium.com
+  path: /
+  tls:
+    enabled: true
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: backend
+  tier: customer-facing
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+config:
+  LOG_LEVEL: "info"
+  # Add more non-sensitive config here

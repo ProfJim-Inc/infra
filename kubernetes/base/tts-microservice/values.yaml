@@ -1,0 +1,55 @@
+# tts-microservice — compute-heavy service
+nameOverride: tts-microservice
+
+image:
+  repository: ghcr.io/creatium/tts-microservice
+  tag: "latest"
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 20
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 20
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilization: 60
+  targetMemoryUtilization: 70
+
+ingress:
+  enabled: false  # Internal service, accessed via ClusterIP
+
+# Runs on compute pool — heavier workload
+nodeSelector:
+  pool: compute
+
+tolerations:
+  - key: workload
+    value: compute
+    effect: NoSchedule
+
+commonLabels:
+  team: backend
+  tier: customer-facing
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics

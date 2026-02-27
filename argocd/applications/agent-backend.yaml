@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-backend
+  namespace: argocd
+  labels:
+    team: backend
+    tier: customer-facing
+spec:
+  project: creatium
+
+  source:
+    repoURL: https://github.com/creatium/infra.git
+    targetRevision: main
+    path: kubernetes/charts/creatium-service
+    helm:
+      valueFiles:
+        - ../../../kubernetes/base/agent-backend/values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true       # Remove resources not in Git
+      selfHeal: true    # Fix drift from manual changes
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

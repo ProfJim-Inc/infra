@@ -1,0 +1,52 @@
+# agent-frontend — Node.js/Next.js service
+nameOverride: agent-frontend
+
+image:
+  repository: ghcr.io/creatium/agent-frontend
+  tag: "latest"
+
+containerPort: 3000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /api/health
+    initialDelaySeconds: 10
+  readiness:
+    enabled: true
+    path: /api/health
+    initialDelaySeconds: 5
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: app.creatium.com
+  path: /
+  tls:
+    enabled: true
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: frontend
+  tier: customer-facing
+  cost-center: engineering
+
+config:
+  NEXT_PUBLIC_API_URL: "https://api.creatium.com"

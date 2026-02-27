@@ -1,0 +1,136 @@
+# =============================================================================
+# Creatium Shared Service Chart — Default Values
+# =============================================================================
+# Each service overrides these in its own values file.
+# Only change defaults here if they apply to ALL services.
+# =============================================================================
+
+# -- Service name (required per-service)
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Number of replicas. Customer-facing services should use at least 2.
+replicaCount: 2
+
+image:
+  # -- Container registry and image name
+  repository: ghcr.io/creatium/CHANGE_ME
+  # -- Image tag. CI/CD overrides this with Git SHA.
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# -- Container port the application listens on
+containerPort: 3000
+
+# -- Service type and port
+service:
+  type: ClusterIP
+  port: 80
+
+# -- Resource requests and limits
+# Requests = guaranteed resources. Limits = ceiling.
+# Start conservative, adjust based on monitoring data.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# -- Health check configuration
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# -- Horizontal Pod Autoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+# -- Pod Disruption Budget
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# -- Ingress configuration
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  host: ""
+  path: /
+  pathType: Prefix
+  tls:
+    enabled: true
+    secretName: ""
+
+# -- Node pool targeting
+nodeSelector:
+  pool: general
+
+# -- Tolerations (for compute-pool workloads)
+tolerations: []
+
+# -- Affinity rules
+affinity: {}
+
+# -- Environment variables from ConfigMap
+config: {}
+  # DATABASE_HOST: "postgres.internal"
+  # REDIS_URL: "redis://redis.internal:6379"
+  # LOG_LEVEL: "info"
+
+# -- Environment variables from Secrets (names of K8s Secrets to mount)
+secretRefs: []
+  # - name: stripe-api-key
+  #   key: STRIPE_API_KEY
+
+# -- External Secrets Operator — pull secrets from Vault / GCP Secret Manager
+externalSecrets:
+  enabled: false
+  secretStore: ""
+  data: []
+    # - secretKey: STRIPE_API_KEY
+    #   remoteRef:
+    #     key: production/billing-service/stripe-api-key
+
+# -- Kubernetes labels applied to all resources
+commonLabels:
+  team: ""
+  tier: ""               # "customer-facing" or "internal"
+  cost-center: "engineering"
+
+# -- ServiceMonitor for Prometheus (if metrics endpoint exists)
+serviceMonitor:
+  enabled: false
+  path: /metrics
+  interval: 30s
+
+# -- Deployment strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0    # Zero downtime for customer-facing services
+
+# -- Service account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}

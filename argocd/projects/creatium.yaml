@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: creatium
+  namespace: argocd
+spec:
+  description: "Creatium production services"
+
+  # Only allow deploying to these namespaces
+  destinations:
+    - namespace: production
+      server: https://kubernetes.default.svc
+    - namespace: staging
+      server: https://kubernetes.default.svc
+    - namespace: internal
+      server: https://kubernetes.default.svc
+    - namespace: data
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+
+  # Only allow deploying from our infra repo
+  sourceRepos:
+    - "https://github.com/creatium/infra.git"
+
+  # Allow these Kubernetes resource types
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: "*"
+    - group: apps
+      kind: "*"
+    - group: networking.k8s.io
+      kind: "*"
+    - group: autoscaling
+      kind: "*"
+    - group: policy
+      kind: "*"
+    - group: monitoring.coreos.com
+      kind: "*"
