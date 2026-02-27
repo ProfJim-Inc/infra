@@ -4,15 +4,27 @@ GitOps monorepo for all Creatium infrastructure — Kubernetes workloads, Helm c
 
 ## Table of Contents
 
-- [Architecture Overview](#architecture-overview)
-- [Repository Structure](#repository-structure)
-- [Services](#services)
-- [Node Pools](#node-pools)
-- [CI/CD — GitHub Actions](#cicd--github-actions)
-- [Deploying to a New Linode Region](#deploying-to-a-new-linode-region)
-- [Migrating to GCP (GKE)](#migrating-to-gcp-gke)
-- [Local Development](#local-development)
-- [Required Secrets](#required-secrets)
+- [Creatium Infrastructure](#creatium-infrastructure)
+  - [Table of Contents](#table-of-contents)
+  - [Architecture Overview](#architecture-overview)
+  - [Repository Structure](#repository-structure)
+  - [Services](#services)
+  - [Node Pools](#node-pools)
+  - [CI/CD — GitHub Actions](#cicd--github-actions)
+    - [Terraform Plan (PRs)](#terraform-plan-prs)
+    - [Terraform Apply (merge to main)](#terraform-apply-merge-to-main)
+    - [Required GitHub Secrets](#required-github-secrets)
+  - [Deploying to a New Linode Region](#deploying-to-a-new-linode-region)
+    - [Steps](#steps)
+  - [Migrating to GCP (GKE)](#migrating-to-gcp-gke)
+    - [What stays the same (zero changes needed)](#what-stays-the-same-zero-changes-needed)
+    - [What needs to be rewritten](#what-needs-to-be-rewritten)
+    - [Migration strategy — blue/green, zero downtime](#migration-strategy--bluegreen-zero-downtime)
+  - [Local Development](#local-development)
+    - [Prerequisites](#prerequisites)
+    - [Running Terraform locally](#running-terraform-locally)
+    - [Linting Helm charts](#linting-helm-charts)
+    - [Getting the kubeconfig](#getting-the-kubeconfig)
 
 ---
 
@@ -328,3 +340,5 @@ terraform output -raw kubeconfig | base64 -d > ~/.kube/creatium-us.yaml
 export KUBECONFIG=~/.kube/creatium-us.yaml
 kubectl get nodes
 ```
+
+For test PR
