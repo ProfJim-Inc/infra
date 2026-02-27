@@ -1,0 +1,35 @@
+name: Helm Lint
+
+on:
+  pull_request:
+    paths:
+      - 'kubernetes/**'
+
+jobs:
+  lint:
+    name: Lint Helm Charts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v3
+
+      # Lint the shared chart
+      - name: Lint creatium-service chart
+        run: helm lint kubernetes/charts/creatium-service/
+
+      # Lint with each service's values to catch per-service issues
+      - name: Lint with agent-backend values
+        run: |
+          helm lint kubernetes/charts/creatium-service/ \
+            -f kubernetes/base/agent-backend/values.yaml
+
+      - name: Lint with agent-frontend values
+        run: |
+          helm lint kubernetes/charts/creatium-service/ \
+            -f kubernetes/base/agent-frontend/values.yaml
+
+      - name: Lint with tts-microservice values
+        run: |
+          helm lint kubernetes/charts/creatium-service/ \
+            -f kubernetes/base/tts-microservice/values.yaml
