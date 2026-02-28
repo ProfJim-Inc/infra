@@ -27,8 +27,15 @@ spec:
   ignoreDifferences:
     - group: apps
       kind: StatefulSet
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[].apiVersion
+        - .spec.volumeClaimTemplates[].kind
+        - .spec.volumeClaimTemplates[].metadata.resourceVersion
+    - group: ""
+      kind: Service
       jsonPointers:
-        - /spec/volumeClaimTemplates
+        - /spec/clusterIP
+        - /spec/clusterIPs
 
   syncPolicy:
     automated:
@@ -36,7 +43,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
       - PrunePropagationPolicy=foreground
     retry:
       limit: 3
