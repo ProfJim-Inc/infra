@@ -37,7 +37,7 @@ module "cluster" {
   source = "../../modules/cluster"
 
   cluster_name       = "creatium-us"
-  k8s_version        = "1.31"
+  k8s_version        = "1.33"
   region             = "us-east"
   default_pool_type  = "g6-standard-2"
   default_pool_count = 2
