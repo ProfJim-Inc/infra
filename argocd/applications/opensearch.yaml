@@ -24,6 +24,12 @@ spec:
     server: https://kubernetes.default.svc
     namespace: logging
 
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates
+
   syncPolicy:
     automated:
       prune: true
