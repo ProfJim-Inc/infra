@@ -79,7 +79,7 @@ module "system_pool" {
   cluster_id         = module.cluster.cluster_id
   instance_type      = "g6-standard-2"    # 2 vCPU, 4GB RAM
   autoscaler_enabled = false
-  node_count         = 1  # TODO: restore to 2 after limit increase
+  node_count         = 2
   tags               = ["pool:system", "creatium"]
 }
 

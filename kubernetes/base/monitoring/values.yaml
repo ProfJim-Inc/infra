@@ -1,0 +1,105 @@
+# =============================================================================
+# kube-prometheus-stack — System Pool Values
+# All components pinned to the system pool (pool: system)
+# =============================================================================
+
+# -- Global node targeting: system pool
+global:
+  nodeSelector:
+    pool: system
+
+# =============================================================================
+# Grafana
+# =============================================================================
+grafana:
+  nodeSelector:
+    pool: system
+
+  adminPassword: ""  # Set via: kubectl create secret generic grafana-admin -n monitoring --from-literal=admin-password=<pass>
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.creatium.com
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.creatium.com
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Pre-load dashboards for our services
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+# =============================================================================
+# Prometheus
+# =============================================================================
+prometheus:
+  prometheusSpec:
+    nodeSelector:
+      pool: system
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+    retention: 15d
+    retentionSize: "10GB"
+
+    # Scrape ServiceMonitors from all namespaces (picks up agent-backend, tts-microservice)
+    serviceMonitorNamespaceSelector:
+      matchLabels: {}
+    serviceMonitorSelector:
+      matchLabels: {}
+
+    podMonitorNamespaceSelector:
+      matchLabels: {}
+    podMonitorSelector:
+      matchLabels: {}
+
+# =============================================================================
+# Alertmanager
+# =============================================================================
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector:
+      pool: system
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# =============================================================================
+# Node Exporter — runs on ALL nodes (DaemonSet, no nodeSelector)
+# =============================================================================
+prometheus-node-exporter:
+  nodeSelector: {}
+
+# =============================================================================
+# kube-state-metrics
+# =============================================================================
+kube-state-metrics:
+  nodeSelector:
+    pool: system
