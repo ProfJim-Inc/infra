@@ -37,10 +37,10 @@ module "cluster" {
   source = "../../modules/cluster"
 
   cluster_name       = "creatium-us"
-  k8s_version        = "1.33"
+  k8s_version        = "1.34"
   region             = "us-east"
   default_pool_type  = "g6-standard-2"
-  default_pool_count = 2
+  default_pool_count = 1  # TODO: restore to 2 after limit increase
   tags               = ["creatium", "production", "us-east"]
 }
 
@@ -55,7 +55,7 @@ module "general_pool" {
   cluster_id         = module.cluster.cluster_id
   instance_type      = "g6-standard-4"    # 4 vCPU, 8GB RAM
   autoscaler_enabled = true
-  min_nodes          = 2
+  min_nodes          = 1  # TODO: restore to 2 after limit increase
   max_nodes          = 8
   tags               = ["pool:general", "creatium"]
 }
@@ -65,7 +65,7 @@ module "compute_pool" {
   source = "../../modules/node-pool"
 
   cluster_id         = module.cluster.cluster_id
-  instance_type      = "g6-dedicated-8"   # 8 vCPU dedicated, 16GB RAM
+  instance_type      = "g6-dedicated-8"   # 6 vCPU dedicated, 12GB RAM
   autoscaler_enabled = true
   min_nodes          = 1
   max_nodes          = 5
@@ -79,7 +79,7 @@ module "system_pool" {
   cluster_id         = module.cluster.cluster_id
   instance_type      = "g6-standard-2"    # 2 vCPU, 4GB RAM
   autoscaler_enabled = false
-  node_count         = 2
+  node_count         = 1  # TODO: restore to 2 after limit increase
   tags               = ["pool:system", "creatium"]
 }
 
