@@ -14,7 +14,6 @@ config:
     opensearch.hosts: [http://opensearch-cluster-master.logging.svc.cluster.local:9200]
     opensearch.ssl.verificationMode: none
     server.host: 0.0.0.0
-    opensearch_security.disabled: true
 
 extraEnvs:
   - name: DISABLE_SECURITY_DASHBOARDS_PLUGIN
