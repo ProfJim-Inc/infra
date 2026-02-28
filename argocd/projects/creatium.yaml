@@ -18,15 +18,30 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: monitoring
       server: https://kubernetes.default.svc
+    - namespace: logging
+      server: https://kubernetes.default.svc
 
-  # Only allow deploying from our infra repo
+  # Only allow deploying from our infra repo and approved Helm charts
   sourceRepos:
-    - "https://github.com/creatium/infra.git"
+    - "https://github.com/ProfJim-Inc/infra.git"
+    - "https://prometheus-community.github.io/helm-charts"
+    - "https://opensearch-project.github.io/helm-charts"
+    - "https://fluent.github.io/helm-charts"
 
   # Allow these Kubernetes resource types
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
 
   namespaceResourceWhitelist:
     - group: ""

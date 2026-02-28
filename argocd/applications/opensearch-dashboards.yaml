@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensearch-dashboards
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+spec:
+  project: creatium
+
+  sources:
+    - repoURL: https://opensearch-project.github.io/helm-charts
+      chart: opensearch-dashboards
+      targetRevision: "2.x"
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/logging/opensearch-dashboards-values.yaml
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

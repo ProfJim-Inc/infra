@@ -1,0 +1,44 @@
+# =============================================================================
+# OpenSearch — Single-node, system pool
+# =============================================================================
+
+# Single node for now — scale up after Linode limit increase
+replicas: 1
+minimumMasterNodes: 1
+
+nodeSelector:
+  pool: system
+
+# Disable security for internal-only cluster (enable once TLS certs are in place)
+config:
+  opensearch.yml: |
+    cluster.name: creatium-logs
+    network.host: 0.0.0.0
+    plugins.security.disabled: true
+
+extraEnvs:
+  - name: DISABLE_INSTALL_DEMO_CONFIG
+    value: "true"
+  - name: DISABLE_SECURITY_PLUGIN
+    value: "true"
+
+# Java heap — keep under 50% of node RAM (system pool: g6-standard-2 = 4GB)
+opensearchJavaOpts: "-Xmx1g -Xms1g"
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+# Persistent storage via Linode block storage
+persistence:
+  enabled: true
+  storageClass: "linode-block-storage"
+  size: 20Gi
+
+service:
+  type: ClusterIP
+  port: 9200

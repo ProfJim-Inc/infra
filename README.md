@@ -8,6 +8,14 @@ GitOps monorepo for all Creatium infrastructure — Kubernetes workloads, Helm c
   - [Table of Contents](#table-of-contents)
   - [Architecture Overview](#architecture-overview)
   - [Repository Structure](#repository-structure)
+  - [Bringing Up the Infrastructure](#bringing-up-the-infrastructure)
+    - [Required tools](#required-tools)
+    - [Step 1 — Configure credentials](#step-1--configure-credentials)
+    - [Step 2 — Provision the cluster with Terraform](#step-2--provision-the-cluster-with-terraform)
+    - [Step 3 — Configure kubectl](#step-3--configure-kubectl)
+    - [Step 4 — Bootstrap ArgoCD](#step-4--bootstrap-argocd)
+    - [Step 5 — Create required secrets](#step-5--create-required-secrets)
+    - [Step 6 — Verify the ops stack](#step-6--verify-the-ops-stack)
   - [Services](#services)
   - [Node Pools](#node-pools)
   - [CI/CD — GitHub Actions](#cicd--github-actions)
@@ -101,6 +109,122 @@ GitHub (this repo)
         ├── node-pool/            # linode_lke_node_pool (autoscaling)
         └── networking/           # linode_firewall
 ```
+
+---
+
+## Bringing Up the Infrastructure
+
+Complete steps to provision the cluster from scratch and get all services running.
+
+### Required tools
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.5.0
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/) >= 3.0
+- A Linode account with API access
+- A Linode Object Storage bucket named `creatium-terraform-state` in `us-ord-1`
+
+Create the state bucket if it doesn't exist:
+
+```bash
+linode-cli obj mb creatium-terraform-state --cluster us-ord-1
+```
+
+### Step 1 — Configure credentials
+
+```bash
+cd terraform/environments/linode-us
+
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars and set linode_api_token
+
+# Linode Object Storage keys for the Terraform state backend
+export AWS_ACCESS_KEY_ID=<linode-obj-access-key>
+export AWS_SECRET_ACCESS_KEY=<linode-obj-secret-key>
+```
+
+### Step 2 — Provision the cluster with Terraform
+
+```bash
+terraform init
+terraform apply
+```
+
+This creates:
+
+- LKE cluster (`creatium-us`, `us-east`, k8s 1.34)
+- System pool: `g6-standard-2` × 2 nodes (monitoring, logging, ArgoCD)
+- Compute pool: `g6-dedicated-8` × 1–5 nodes (ML inference, TTS)
+- Firewall rules restricting kube-apiserver access
+
+### Step 3 — Configure kubectl
+
+```bash
+terraform output -raw kubeconfig | base64 -d > ~/.kube/creatium-us.yaml
+export KUBECONFIG=~/.kube/creatium-us.yaml
+kubectl get nodes   # all nodes should show Ready
+```
+
+### Step 4 — Bootstrap ArgoCD
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Wait for ArgoCD to be ready
+kubectl wait --for=condition=available deployment/argocd-server \
+  -n argocd --timeout=120s
+
+# Apply the project and all applications
+kubectl apply -f argocd/projects/creatium.yaml
+kubectl apply -f argocd/applications/
+```
+
+### Step 5 — Create required secrets
+
+Grafana admin credentials:
+
+```bash
+kubectl create namespace monitoring
+kubectl create secret generic grafana-admin \
+  -n monitoring \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password=<your-password>
+```
+
+Application secrets (repeat for each service that needs them):
+
+```bash
+kubectl create namespace production
+# Example: kubectl create secret generic <secret-name> -n production --from-literal=KEY=value
+```
+
+### Step 6 — Verify the ops stack
+
+Once ArgoCD syncs (watch progress at `kubectl port-forward svc/argocd-server -n argocd 8080:443`):
+
+```bash
+# All ArgoCD apps should show Synced + Healthy
+kubectl get applications -n argocd
+
+# Monitoring stack
+kubectl get pods -n monitoring
+
+# Logging stack
+kubectl get pods -n logging
+
+# Application services
+kubectl get pods -n production
+```
+
+| Component             | URL                                      | Notes                       |
+|-----------------------|------------------------------------------|-----------------------------|
+| Grafana               | `https://grafana.creatium.com`           | Dashboards for all services |
+| OpenSearch Dashboards | `https://logs.creatium.com`              | Log exploration             |
+| ArgoCD                | port-forward `argocd-server:443` locally | GitOps sync status          |
+
+> **Note:** DNS for `grafana.creatium.com` and `logs.creatium.com` must point to the nginx-ingress LoadBalancer IP. Get the IP with `kubectl get svc -n ingress-nginx`.
 
 ---
 

@@ -1,0 +1,37 @@
+# =============================================================================
+# OpenSearch Dashboards — system pool
+# =============================================================================
+
+nodeSelector:
+  pool: system
+
+replicaCount: 1
+
+opensearchHosts: "http://opensearch-cluster-master.logging.svc.cluster.local:9200"
+
+config:
+  opensearch_dashboards.yml: |
+    opensearch.hosts: [http://opensearch-cluster-master.logging.svc.cluster.local:9200]
+    opensearch.ssl.verificationMode: none
+    server.host: 0.0.0.0
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - host: logs.creatium.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: opensearch-dashboards-tls
+      hosts:
+        - logs.creatium.com
