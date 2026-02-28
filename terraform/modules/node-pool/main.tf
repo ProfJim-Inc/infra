@@ -21,6 +21,10 @@ resource "linode_lke_node_pool" "this" {
   }
 
   tags = var.tags
+
+  lifecycle {
+    ignore_changes = [node_count]
+  }
 }
 
 output "pool_id" {

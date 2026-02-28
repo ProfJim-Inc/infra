@@ -31,7 +31,7 @@ variable "min_nodes" {
 variable "max_nodes" {
   description = "Maximum nodes when autoscaling is enabled"
   type        = number
-  default     = 8
+  default     = 4
 }
 
 variable "tags" {
