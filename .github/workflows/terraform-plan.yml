@@ -41,6 +41,8 @@ jobs:
         env:
           LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
           TF_VAR_linode_api_token: ${{ secrets.LINODE_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.LINODE_OBJ_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.LINODE_OBJ_SECRET_KEY }}
 
       - name: Post Plan to PR
         uses: actions/github-script@v7
