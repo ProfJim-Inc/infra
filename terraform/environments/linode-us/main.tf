@@ -13,8 +13,11 @@ terraform {
   backend "s3" {
     bucket                      = "creatium-terraform-state"
     key                         = "linode-us/terraform.tfstate"
-    region                      = "us-east-1"
-    endpoint                    = "us-east-1.linodeobjects.com"
+    region                      = "us-ord-1"
+    endpoints = {
+      s3 = "https://us-ord-1.linodeobjects.com"
+    }
+    use_path_style              = true
     skip_credentials_validation = true
     skip_metadata_api_check     = true
     skip_region_validation      = true

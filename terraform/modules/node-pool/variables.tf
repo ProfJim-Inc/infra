@@ -26,6 +26,8 @@ variable "min_nodes" {
   default     = 2
 }
 
+
+
 variable "max_nodes" {
   description = "Maximum nodes when autoscaling is enabled"
   type        = number
