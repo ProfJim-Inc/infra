@@ -307,6 +307,68 @@ The key insight: because ArgoCD syncs from this Git repo, the moment GKE is up a
 - [Helm](https://helm.sh/docs/intro/install/) >= 3.0
 - [ArgoCD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) (optional)
 
+### Installing Terraform
+
+#### macOS
+
+```bash
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
+
+# Verify
+terraform version
+```
+
+> No Homebrew? Download the macOS binary directly from [developer.hashicorp.com/terraform/install](https://developer.hashicorp.com/terraform/install) and move it to `/usr/local/bin/`.
+
+#### Linux (Ubuntu / Debian)
+
+```bash
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+sudo apt update && sudo apt install terraform
+
+# Verify
+terraform version
+```
+
+#### Linux (RHEL / Fedora / Amazon Linux)
+
+```bash
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+sudo yum install terraform
+
+# Verify
+terraform version
+```
+
+#### Windows
+
+Option 1 — Chocolatey (recommended):
+
+```powershell
+choco install terraform
+```
+
+Option 2 — Winget:
+
+```powershell
+winget install HashiCorp.Terraform
+```
+
+Option 3 — Manual: download the Windows zip from [developer.hashicorp.com/terraform/install](https://developer.hashicorp.com/terraform/install), extract `terraform.exe`, and add its folder to your `PATH` environment variable.
+
+```powershell
+# Verify (PowerShell or CMD)
+terraform version
+```
+
+---
+
 ### Running Terraform locally
 
 ```bash
@@ -316,6 +378,9 @@ cd terraform/environments/linode-us
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars — never commit this file
 
+# These are Linode Object Storage keys, not AWS keys.
+# Terraform's S3 backend uses AWS SDK under the hood, so it reads
+# these specific env var names even when the endpoint is Linode Object Storage.
 export AWS_ACCESS_KEY_ID=<linode-obj-access-key>
 export AWS_SECRET_ACCESS_KEY=<linode-obj-secret-key>
 
