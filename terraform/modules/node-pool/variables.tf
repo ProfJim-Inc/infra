@@ -39,3 +39,9 @@ variable "tags" {
   type        = list(string)
   default     = []
 }
+
+variable "labels" {
+  description = "Kubernetes node labels to apply to all nodes in the pool"
+  type        = map(string)
+  default     = {}
+}

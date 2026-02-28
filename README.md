@@ -181,6 +181,92 @@ kubectl apply -f argocd/projects/creatium.yaml
 kubectl apply -f argocd/applications/
 ```
 
+### Step 4b — Access the ArgoCD UI
+
+**Install the ArgoCD CLI (optional but recommended):**
+
+macOS:
+
+```bash
+brew install argocd
+```
+
+Linux:
+
+```bash
+curl -sSL -o argocd-linux-amd64 \
+  https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
+rm argocd-linux-amd64
+argocd version --client
+```
+
+Windows (via Winget):
+
+```powershell
+winget install ArgoProj.ArgoCD
+```
+
+Windows (via Chocolatey):
+
+```powershell
+choco install argocd-cli
+```
+
+Windows (manual): download `argocd-windows-amd64.exe` from the [ArgoCD releases page](https://github.com/argoproj/argo-cd/releases/latest), rename it to `argocd.exe`, and add its folder to your `PATH`.
+
+Once installed, connect the CLI to your cluster:
+
+```bash
+# Run port-forward in a separate terminal first (see below)
+argocd login localhost:8080 --insecure \
+  --username admin \
+  --password $(kubectl get secret argocd-initial-admin-secret \
+    -n argocd -o jsonpath="{.data.password}" | base64 -d)
+```
+
+---
+
+**Get the initial admin password:**
+
+```bash
+kubectl get secret argocd-initial-admin-secret \
+  -n argocd \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+> After first login, change the password in the ArgoCD UI under **User Info → Update Password**, then delete the secret with `kubectl delete secret argocd-initial-admin-secret -n argocd`.
+
+**Open the UI (port-forward):**
+
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Then open `https://localhost:8080` in your browser (accept the self-signed cert warning).
+
+- **Username:** `admin`
+- **Password:** output from the command above
+
+**Sync all applications from the UI:**
+
+1. Click an application tile
+2. Click **Sync** → **Synchronize**
+3. Watch resources turn green as they deploy
+
+Or trigger a sync for all apps via kubectl without the CLI:
+
+```bash
+for app in kube-prometheus-stack opensearch opensearch-dashboards fluent-bit \
+           agent-backend agent-frontend tts-microservice; do
+  kubectl patch application $app -n argocd \
+    --type merge \
+    -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"HEAD"}}}'
+done
+```
+
+---
+
 ### Step 5 — Create required secrets
 
 Grafana admin credentials:
