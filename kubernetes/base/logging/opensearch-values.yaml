@@ -6,10 +6,6 @@
 replicas: 1
 minimumMasterNodes: 1
 
-# Runs a privileged initContainer: sysctl -w vm.max_map_count=262144
-# Required by OpenSearch/Elasticsearch on every node
-sysctlVmMaxMapCount: 262144
-
 nodeSelector:
   pool: system
 
@@ -46,6 +42,16 @@ persistence:
 service:
   type: ClusterIP
   port: 9200
+
+# vm.max_map_count must be >= 262144 for OpenSearch to start.
+# This initContainer sets it on the host node before OpenSearch launches.
+extraInitContainers:
+  - name: sysctl
+    image: busybox
+    command: ["sysctl", "-w", "vm.max_map_count=262144"]
+    securityContext:
+      privileged: true
+      runAsUser: 0
 
 # OpenSearch is slow to start (JVM init + block storage mount)
 # Give it up to 10 minutes before failing
