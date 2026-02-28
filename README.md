@@ -310,7 +310,21 @@ kubectl get pods -n production
 | OpenSearch Dashboards | `https://logs.creatium.com`              | Log exploration             |
 | ArgoCD                | port-forward `argocd-server:443` locally | GitOps sync status          |
 
-> **Note:** DNS for `grafana.creatium.com` and `logs.creatium.com` must point to the nginx-ingress LoadBalancer IP. Get the IP with `kubectl get svc -n ingress-nginx`.
+> **Note:** DNS for `grafana.creatium.com` and `logs.creatium.com` must point to the nginx-ingress LoadBalancer IP. Get the IP with `kubectl get svc -n ingress-nginx ingress-nginx-controller`.
+
+#### Accessing dashboards without DNS (port-forward)
+
+If DNS is not yet configured, access Grafana and OpenSearch Dashboards directly via `kubectl port-forward`:
+
+```bash
+# Grafana — http://localhost:3000
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+
+# OpenSearch Dashboards — http://localhost:5601
+kubectl port-forward -n logging svc/opensearch-dashboards 5601:5601
+```
+
+Open the URLs in your browser while the port-forward is running. Use the Grafana admin credentials created in Step 5.
 
 ---
 
