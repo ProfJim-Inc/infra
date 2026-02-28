@@ -24,15 +24,4 @@ resources:
     memory: 512Mi
 
 ingress:
-  enabled: true
-  ingressClassName: nginx
-  annotations:
-    kubernetes.io/ingress.class: nginx
-  hosts:
-    - host: logs.creatium.com
-      paths:
-        - path: /
-  tls:
-    - secretName: opensearch-dashboards-tls
-      hosts:
-        - logs.creatium.com
+  enabled: false
