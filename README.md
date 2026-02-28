@@ -22,6 +22,11 @@ GitOps monorepo for all Creatium infrastructure — Kubernetes workloads, Helm c
     - [Migration strategy — blue/green, zero downtime](#migration-strategy--bluegreen-zero-downtime)
   - [Local Development](#local-development)
     - [Prerequisites](#prerequisites)
+    - [Installing Terraform](#installing-terraform)
+      - [macOS](#macos)
+      - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
+      - [Linux (RHEL / Fedora / Amazon Linux)](#linux-rhel--fedora--amazon-linux)
+      - [Windows](#windows)
     - [Running Terraform locally](#running-terraform-locally)
     - [Linting Helm charts](#linting-helm-charts)
     - [Getting the kubeconfig](#getting-the-kubeconfig)
@@ -405,5 +410,3 @@ terraform output -raw kubeconfig | base64 -d > ~/.kube/creatium-us.yaml
 export KUBECONFIG=~/.kube/creatium-us.yaml
 kubectl get nodes
 ```
-
-For test PR
