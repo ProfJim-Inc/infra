@@ -20,7 +20,8 @@ resource "linode_lke_node_pool" "this" {
     }
   }
 
-  tags = var.tags
+  tags   = var.tags
+  labels = var.labels
 
   lifecycle {
     ignore_changes = [node_count]

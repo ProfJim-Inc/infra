@@ -58,6 +58,7 @@ module "cluster" {
 #   min_nodes          = 1  # TODO: restore to 2 after limit increase
 #   max_nodes          = 8
 #   tags               = ["pool:general", "creatium"]
+#   labels             = { pool = "general" }
 # }
 
 # Compute pool: ML inference, heavy processing
@@ -70,6 +71,7 @@ module "compute_pool" {
   min_nodes          = 1
   max_nodes          = 5
   tags               = ["pool:compute", "creatium"]
+  labels             = { pool = "compute" }
 }
 
 # System pool: monitoring, ArgoCD, ingress (fixed size)
@@ -81,6 +83,7 @@ module "system_pool" {
   autoscaler_enabled = false
   node_count         = 2
   tags               = ["pool:system", "creatium"]
+  labels             = { pool = "system" }
 }
 
 # -----------------------------------------------
