@@ -92,6 +92,18 @@ alertmanager:
         memory: 256Mi
 
 # =============================================================================
+# Prometheus Operator — move kubelet Service out of kube-system
+# =============================================================================
+prometheusOperator:
+  nodeSelector:
+    pool: system
+  # By default the kubelet Service is created in kube-system.
+  # Moving it to monitoring avoids needing kube-system in the ArgoCD project.
+  kubeletService:
+    enabled: true
+    namespace: monitoring
+
+# =============================================================================
 # Node Exporter — runs on ALL nodes (DaemonSet, no nodeSelector)
 # =============================================================================
 prometheus-node-exporter:
