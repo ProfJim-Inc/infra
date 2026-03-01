@@ -20,6 +20,11 @@ resource "linode_lke_cluster" "this" {
     type  = var.default_pool_type
     count = var.default_pool_count
   }
+
+  lifecycle {
+    # Autoscaler changes node counts on this inline pool — ignore to prevent perpetual diffs
+    ignore_changes = [pool]
+  }
 }
 
 output "cluster_id" {
