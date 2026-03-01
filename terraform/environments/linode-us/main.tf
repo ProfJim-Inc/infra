@@ -49,17 +49,17 @@ module "cluster" {
 # -----------------------------------------------
 
 # General pool: APIs, web services, background workers
-# module "general_pool" {
-#   source = "../../modules/node-pool"
+module "general_pool" {
+  source = "../../modules/node-pool"
 
-#   cluster_id         = module.cluster.cluster_id
-#   instance_type      = "g6-standard-4"    # 4 vCPU, 8GB RAM
-#   autoscaler_enabled = true
-#   min_nodes          = 1  # TODO: restore to 2 after limit increase
-#   max_nodes          = 8
-#   tags               = ["pool:general", "creatium"]
-#   labels             = { pool = "general" }
-# }
+  cluster_id         = module.cluster.cluster_id
+  instance_type      = "g6-standard-4"    # 4 vCPU, 8GB RAM
+  autoscaler_enabled = true
+  min_nodes          = 2  # TODO: restore to 2 after limit increase
+  max_nodes          = 8
+  tags               = ["pool:general", "creatium"]
+  labels             = { pool = "general" }
+}
 
 # Compute pool: ML inference, heavy processing
 module "compute_pool" {
@@ -68,7 +68,7 @@ module "compute_pool" {
   cluster_id         = module.cluster.cluster_id
   instance_type      = "g6-dedicated-8"   # 6 vCPU dedicated, 12GB RAM
   autoscaler_enabled = true
-  min_nodes          = 1
+  min_nodes          = 2
   max_nodes          = 5
   tags               = ["pool:compute", "creatium"]
   labels             = { pool = "compute" }
