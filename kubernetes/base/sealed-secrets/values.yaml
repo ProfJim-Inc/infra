@@ -1,0 +1,15 @@
+# =============================================================================
+# Sealed Secrets Controller — System Pool Values
+# Cluster-wide secret decryption controller
+# =============================================================================
+
+nodeSelector:
+  pool: system
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
