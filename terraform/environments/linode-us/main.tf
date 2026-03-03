@@ -79,7 +79,7 @@ module "gpu_pool" {
   source = "../../modules/node-pool"
 
   cluster_id         = module.cluster.cluster_id
-  instance_type      = "g1-gpu-rtx4000-2"    
+  instance_type      = "g2-gpu-rtx4000a1-m"    
   autoscaler_enabled = false
   node_count         = 1
   tags               = ["pool:gpu", "creatium"]
