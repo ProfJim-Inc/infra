@@ -62,6 +62,31 @@ GitHub (this repo)
 
 **GitOps flow:** Terraform provisions the Kubernetes cluster → ArgoCD is bootstrapped into the cluster → ArgoCD syncs all services from this repo continuously. Any change merged to `main` is automatically reflected in the cluster.
 
+### Observability stack
+
+```
+Applications (OTLP traces/metrics)
+        │
+        ▼
+OTeL Collector ──── traces ──→ Grafana Tempo ──→ Grafana (trace view)
+        │
+        └─── metrics ──→ Prometheus ──────────→ Grafana (dashboards)
+
+Fluent Bit (DaemonSet)
+  ├── filters: drop DEBUG/TRACE, extract service name via Lua
+  └── output: OpenSearch  logs-<service>-YYYY.MM.DD  ──→ Grafana (log view)
+                 └── ISM policy: rollover 7d/5GB, delete 30d
+```
+
+| Component | Purpose | Namespace |
+| --- | --- | --- |
+| kube-prometheus-stack | Prometheus + Grafana + Alertmanager | monitoring |
+| Grafana Tempo | Distributed trace storage (OTLP in, TraceQL out) | monitoring |
+| OTeL Collector | OTLP gateway — routes traces to Tempo, metrics to Prometheus | monitoring |
+| OpenSearch | Log storage with per-service daily indices | logging |
+| Fluent Bit | Log collection DaemonSet — ships all node logs to OpenSearch | logging |
+| OpenSearch Dashboards | Log exploration UI at `https://logs.creatium.com` | logging |
+
 ---
 
 ## Repository Structure
@@ -74,16 +99,25 @@ GitHub (this repo)
 │   └── terraform-apply.yml      # Applies Terraform on merge to main
 │
 ├── argocd/
-│   ├── projects/creatium.yaml   # ArgoCD AppProject — namespace + repo allowlist
+│   ├── projects/creatium.yaml      # ArgoCD AppProject — namespace + repo allowlist
 │   └── applications/
 │       ├── agent-backend.yaml
 │       ├── agent-frontend.yaml
-│       └── tts-microservice.yaml
+│       ├── tts-microservice.yaml
+│       ├── kube-prometheus-stack.yaml
+│       ├── tempo.yaml              # Distributed trace storage
+│       ├── otel-collector.yaml     # OTLP telemetry gateway
+│       ├── opensearch.yaml
+│       ├── opensearch-dashboards.yaml
+│       ├── fluent-bit.yaml
+│       ├── ingress-nginx.yaml
+│       ├── nvidia-device-plugin.yaml
+│       └── argocd-image-updater.yaml
 │
 ├── kubernetes/
-│   ├── charts/creatium-service/ # Shared Helm chart for all services
+│   ├── charts/creatium-service/    # Shared Helm chart for all services
 │   │   ├── Chart.yaml
-│   │   ├── values.yaml          # Defaults — override per service
+│   │   ├── values.yaml             # Defaults — override per service
 │   │   └── templates/
 │   │       ├── deployment.yaml
 │   │       ├── service.yaml
@@ -96,7 +130,17 @@ GitHub (this repo)
 │   └── base/
 │       ├── agent-backend/values.yaml
 │       ├── agent-frontend/values.yaml
-│       └── tts-microservice/values.yaml
+│       ├── tts-microservice/values.yaml
+│       ├── monitoring/
+│       │   ├── values.yaml         # kube-prometheus-stack overrides
+│       │   ├── tempo-values.yaml
+│       │   └── otel-collector-values.yaml
+│       └── logging/
+│           ├── opensearch-values.yaml
+│           ├── opensearch-dashboards-values.yaml
+│           ├── opensearch-dashboards-ingress.yaml
+│           ├── opensearch-setup-job.yaml   # Creates ISM policy + index template
+│           └── fluent-bit-values.yaml
 │
 └── terraform/
     ├── environments/
@@ -152,9 +196,10 @@ terraform apply
 
 This creates:
 
-- LKE cluster (`creatium-us`, `us-east`, k8s 1.34)
-- System pool: `g6-standard-2` × 2 nodes (monitoring, logging, ArgoCD)
-- Compute pool: `g6-dedicated-8` × 1–5 nodes (ML inference, TTS)
+- LKE cluster (`creatium-us`, `us-ord`, k8s 1.34)
+- System pool: `g6-standard-2` × 2 nodes — monitoring, logging, ArgoCD, ingress
+- Compute pool: `g6-dedicated-8` × 1–5 nodes (autoscaling) — ML inference
+- GPU pool: `g2-gpu-rtx4000a1-m` × 1 node (fixed) — TTS inference, tainted `nvidia.com/gpu=present:NoSchedule`
 - Firewall rules restricting kube-apiserver access
 
 ### Step 3 — Configure kubectl
@@ -257,8 +302,11 @@ Then open `https://localhost:8080` in your browser (accept the self-signed cert 
 Or trigger a sync for all apps via kubectl without the CLI:
 
 ```bash
-for app in kube-prometheus-stack opensearch opensearch-dashboards fluent-bit \
-           agent-backend agent-frontend tts-microservice; do
+for app in \
+  kube-prometheus-stack tempo otel-collector \
+  opensearch opensearch-dashboards fluent-bit \
+  ingress-nginx nvidia-device-plugin argocd-image-updater \
+  agent-backend agent-frontend tts-microservice; do
   kubectl patch application $app -n argocd \
     --type merge \
     -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"HEAD"}}}'
@@ -279,10 +327,31 @@ kubectl create secret generic grafana-admin \
   --from-literal=admin-password=<your-password>
 ```
 
-Application secrets (repeat for each service that needs them):
+GHCR pull secret (required for all services — images are in a private GitHub Container Registry):
 
 ```bash
 kubectl create namespace production
+kubectl create secret docker-registry ghcr-pull-secret \
+  -n production \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<github-pat-with-read:packages-scope>
+```
+
+TTS microservice secrets:
+
+```bash
+kubectl create secret generic tts-secrets \
+  -n production \
+  --from-literal=KOKORO_API_KEY=<key> \
+  --from-literal=AZURE_STORAGE_CONNECTION_STRING=<conn-string> \
+  --from-literal=OPENSEARCH_USER=<user> \
+  --from-literal=OPENSEARCH_PASS=<password>
+```
+
+Application secrets (repeat for each service that needs them):
+
+```bash
 # Example: kubectl create secret generic <secret-name> -n production --from-literal=KEY=value
 ```
 
@@ -304,13 +373,17 @@ kubectl get pods -n logging
 kubectl get pods -n production
 ```
 
-| Component             | URL                                      | Notes                       |
-|-----------------------|------------------------------------------|-----------------------------|
-| Grafana               | `https://grafana.creatium.com`           | Dashboards for all services |
-| OpenSearch Dashboards | `https://logs.creatium.com`              | Log exploration             |
-| ArgoCD                | port-forward `argocd-server:443` locally | GitOps sync status          |
+| Component | URL | Notes |
+| --- | --- | --- |
+| Grafana | `https://grafana.creatium.com` | Dashboards, traces (Tempo), logs (OpenSearch) |
+| OpenSearch Dashboards | `https://logs.creatium.com` | Raw log exploration |
+| ArgoCD | port-forward `argocd-server:443` locally | GitOps sync status |
 
-> **Note:** DNS for `grafana.creatium.com` and `logs.creatium.com` must point to the nginx-ingress LoadBalancer IP. Get the IP with `kubectl get svc -n ingress-nginx ingress-nginx-controller`.
+> **Note:** DNS for `grafana.creatium.com` and `logs.creatium.com` must point to the ingress-nginx LoadBalancer IP.
+
+```bash
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+```
 
 #### Accessing dashboards without DNS (port-forward)
 
@@ -333,10 +406,12 @@ Open the URLs in your browser while the port-forward is running. Use the Grafana
 All services share the `kubernetes/charts/creatium-service` Helm chart and are deployed to the `production` namespace via ArgoCD.
 
 | Service | Image | Port | Ingress | Pool |
-|---------|-------|------|---------|------|
+| --- | --- | --- | --- | --- |
 | `agent-backend` | `ghcr.io/creatium/agent-backend` | 8000 | `api.creatium.com` | general |
 | `agent-frontend` | `ghcr.io/creatium/agent-frontend` | 3000 | `app.creatium.com` | general |
-| `tts-microservice` | `ghcr.io/creatium/tts-microservice` | 8000 | none (ClusterIP only) | compute |
+| `tts-microservice` | `ghcr.io/creatium/tts-microservice` | 9000 | none (ClusterIP only) | gpu |
+
+> **tts-microservice** requires the GPU node pool. It uses a `Recreate` deployment strategy (rolling update would require two GPUs simultaneously) and tolerates the `nvidia.com/gpu=present:NoSchedule` taint.
 
 **Adding a new service:**
 1. Create `kubernetes/base/<service-name>/values.yaml` overriding the chart defaults
@@ -347,15 +422,16 @@ All services share the `kubernetes/charts/creatium-service` Helm chart and are d
 
 ## Node Pools
 
-The cluster runs three purpose-specific node pools on Linode LKE (`us-east`):
+The cluster runs four purpose-specific node pools on Linode LKE (`us-ord`):
 
 | Pool | Label | Instance type | Nodes | Purpose |
-|------|-------|---------------|-------|---------|
-| General | `pool: general` | g6-standard-4 (4 vCPU / 8GB) | 2–8 (autoscaling) | APIs, web services, background workers |
-| Compute | `pool: compute` | g6-dedicated-8 (8 vCPU dedicated / 16GB) | 1–5 (autoscaling) | ML inference, TTS, heavy processing |
-| System | `pool: system` | g6-standard-2 (2 vCPU / 4GB) | 2 (fixed) | ArgoCD, monitoring, ingress controllers |
+| --- | --- | --- | --- | --- |
+| System | `pool: system` | g6-standard-2 (2 vCPU / 4 GB) | 2 (fixed) | ArgoCD, monitoring, logging, ingress |
+| General | `pool: general` | g6-standard-4 (4 vCPU / 8 GB) | 2–8 (autoscaling) | APIs, web services, background workers |
+| Compute | `pool: compute` | g6-dedicated-8 (8 vCPU / 16 GB dedicated) | 1–5 (autoscaling) | ML inference, heavy processing |
+| GPU | `pool: gpu` | g2-gpu-rtx4000a1-m (NVIDIA RTX 6000) | 1 (fixed) | TTS inference — tainted `nvidia.com/gpu=present:NoSchedule` |
 
-Services target a pool via `nodeSelector` in their `values.yaml`. The `tts-microservice` additionally uses a `NoSchedule` toleration so only compute workloads land on the expensive dedicated nodes.
+Services target a pool via `nodeSelector` in their `values.yaml`. The GPU pool is tainted so only pods that explicitly tolerate `nvidia.com/gpu=present:NoSchedule` (i.e. `tts-microservice`) are scheduled there.
 
 ---
 
