@@ -1,0 +1,126 @@
+# =============================================================================
+# demo-service PrometheusRules
+#
+# Four alert rules that exercise every tier of the Alertmanager pipeline:
+#   DemoServiceHighErrorRate   → warning  → Slack #alerts
+#   DemoServiceHighLatencyP99  → warning  → Slack #alerts
+#   DemoServiceDown            → critical → Slack #alerts-critical (+ #alerts)
+#   DemoServicePodCrashLooping → warning  → Slack #alerts
+#
+# Trigger them manually:
+#   High error rate  → call GET /api/v1/error in a loop
+#   High latency     → call GET /api/v1/slow?delay=3 in a loop
+#   Pod crash loop   → set image to an invalid tag in demo-service values.yaml
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: demo-service
+  namespace: production
+  labels:
+    # These labels let Prometheus find this rule (matches ruleSelector in values.yaml)
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: demo-service
+spec:
+  groups:
+    - name: demo-service.availability
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # Alert 1: No running pods — most critical, immediate action needed
+        # -------------------------------------------------------------------
+        - alert: DemoServiceDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"demo-service.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: demo-service
+            namespace: production
+          annotations:
+            summary: "demo-service has no running pods"
+            description: >-
+              All demo-service replicas are unavailable for > 1 minute.
+              Users are receiving 502s from the ingress.
+            runbook: "kubectl rollout status deployment/demo-service -n production"
+
+        # -------------------------------------------------------------------
+        # Alert 2: Pod crash-looping — surface restarts before full outage
+        # -------------------------------------------------------------------
+        - alert: DemoServicePodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"demo-service-.*"
+              }[15m]
+            ) > 3
+          for: 0m   # fire immediately — no "for" grace period on a crash loop
+          labels:
+            severity: warning
+            service: demo-service
+            namespace: production
+          annotations:
+            summary: "demo-service pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} (container: {{ $labels.container }}) has
+              restarted {{ $value | printf "%.0f" }} times in the last 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: demo-service.slos
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # Alert 3: Error rate > 5% over 5 minutes
+        # Trigger: call GET /api/v1/error in a loop for ~3 minutes
+        # -------------------------------------------------------------------
+        - alert: DemoServiceHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: demo-service
+            namespace: production
+          annotations:
+            summary: "demo-service HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx
+              over the last 5 minutes.
+              Check Grafana Tempo for error traces: https://grafana.creatium.com
+
+        # -------------------------------------------------------------------
+        # Alert 4: P99 latency > 2s over 5 minutes
+        # Trigger: call GET /api/v1/slow?delay=3 in a loop for ~6 minutes
+        # -------------------------------------------------------------------
+        - alert: DemoServiceHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production"}[5m])
+              ) by (le, handler)
+            ) > 2.0
+          for: 5m
+          labels:
+            severity: warning
+            service: demo-service
+            namespace: production
+          annotations:
+            summary: "demo-service P99 latency above 2 seconds"
+            description: >-
+              P99 latency for handler {{ $labels.handler }} is
+              {{ $value | humanizeDuration }} over the last 5 minutes.
+              Check the /api/v1/slow endpoint for artificial delays.

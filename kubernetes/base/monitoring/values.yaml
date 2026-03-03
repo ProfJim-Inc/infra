@@ -108,10 +108,50 @@ prometheus:
     podMonitorSelector:
       matchLabels: {}
 
+    # Evaluate PrometheusRules from ALL namespaces — picks up demo-service alerts in production
+    ruleNamespaceSelector:
+      matchLabels: {}
+    ruleSelector:
+      matchLabels: {}
+
 # =============================================================================
 # Alertmanager
 # =============================================================================
 alertmanager:
+  # Base global routing config.
+  # Per-service routing is handled by AlertmanagerConfig CRs in their own namespaces.
+  # This config provides the default null receiver and inhibition rules.
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      # Unmatched alerts go to null (silently dropped).
+      # AlertmanagerConfig CRs in production/staging pick up service-specific alerts.
+      receiver: "null"
+      group_by: ["namespace", "alertname", "service"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      routes:
+        # Watchdog alert from kube-prometheus-stack — always suppress
+        - matchers:
+            - name: alertname
+              value: Watchdog
+          receiver: "null"
+
+    receivers:
+      - name: "null"
+
+    # Inhibition: if a critical alert fires for the same service, suppress
+    # corresponding warning alerts to reduce noise.
+    inhibit_rules:
+      - source_matchers:
+          - severity = critical
+        target_matchers:
+          - severity = warning
+        equal: [alertname, namespace, service]
+
   alertmanagerSpec:
     nodeSelector:
       pool: system
@@ -123,6 +163,13 @@ alertmanager:
       limits:
         cpu: 200m
         memory: 256Mi
+
+    # Pick up AlertmanagerConfig CRs from all namespaces.
+    # Each CR is automatically scoped to alerts from its own namespace.
+    alertmanagerConfigSelector:
+      matchLabels: {}
+    alertmanagerConfigNamespaceSelector:
+      matchLabels: {}
 
 # =============================================================================
 # Prometheus Operator — move kubelet Service out of kube-system

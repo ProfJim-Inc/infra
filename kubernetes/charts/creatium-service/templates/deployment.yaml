@@ -1,16 +1,65 @@
+# =============================================================================
+# Deployment — runs and manages the service pods
+#
+# A Deployment tells Kubernetes:
+#   "I want N copies of this container image running at all times."
+#
+# Kubernetes then:
+#   - Schedules pods onto nodes that have enough CPU/memory
+#   - Restarts pods that crash (liveness probe fails)
+#   - Stops sending traffic to pods that aren't ready (readiness probe fails)
+#   - Rolls out new versions one pod at a time (rolling update strategy)
+#   - Rolls back automatically if the new version fails health checks
+#
+# This template is rendered by Helm using values from each service's values.yaml.
+# The {{ .Values.xxx }} placeholders are replaced at deploy time.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  # The release name is derived from the Helm release — usually the service name.
+  # "include" calls a named template defined in _helpers.tpl.
   name: {{ include "creatium-service.fullname" . }}
   labels:
     {{- include "creatium-service.labels" . | nindent 4 }}
 spec:
+  # ---------------------------------------------------------------------------
+  # Replica count
+  #
+  # Only set replicas directly when HPA is disabled.
+  # When HPA is enabled, it manages replica count dynamically based on CPU/memory.
+  # Setting replicas here AND enabling HPA causes a conflict — HPA wins but Terraform
+  # would constantly try to reset it. The "if not autoscaling.enabled" guard prevents this.
+  # ---------------------------------------------------------------------------
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
+
+  # The selector links this Deployment to its pods.
+  # Kubernetes uses this to know which pods belong to this Deployment.
+  # IMPORTANT: matchLabels must match the pod template labels below.
+  # Changing these after creation requires deleting and recreating the Deployment.
   selector:
     matchLabels:
       {{- include "creatium-service.selectorLabels" . | nindent 6 }}
+
+  # ---------------------------------------------------------------------------
+  # Deployment strategy
+  #
+  # RollingUpdate (default): replaces pods one at a time.
+  #   - maxSurge: 1     → allow one extra pod above the desired count during rollout
+  #   - maxUnavailable: 0 → never take a pod down until its replacement is ready
+  #   Result: zero-downtime deploys. New pod starts, passes readiness probe, then
+  #           old pod is stopped. Traffic is never interrupted.
+  #
+  # Recreate: stops ALL old pods before starting new ones.
+  #   - Causes a brief outage — use only for GPU workloads where two pods cannot
+  #     share the same GPU simultaneously (e.g., tts-microservice).
+  #
+  # Override per-service in values.yaml:
+  #   strategy:
+  #     type: Recreate
+  # ---------------------------------------------------------------------------
   strategy:
     type: {{ .Values.strategy.type }}
     {{- if eq .Values.strategy.type "RollingUpdate" }}
@@ -18,35 +67,105 @@ spec:
       maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
       maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
     {{- end }}
+
   template:
     metadata:
       labels:
         {{- include "creatium-service.selectorLabels" . | nindent 8 }}
     spec:
+      # The pod uses a dedicated ServiceAccount so it can have specific RBAC permissions.
+      # Required for Workload Identity (GCP) or IRSA (AWS) if the service needs
+      # to call cloud APIs. Even without cloud APIs, a dedicated SA is best practice.
       serviceAccountName: {{ include "creatium-service.serviceAccountName" . }}
+
+      # ---------------------------------------------------------------------------
+      # Termination grace period
+      #
+      # When Kubernetes wants to stop a pod (scaling down, node drain, rolling update),
+      # it sends SIGTERM to the container process. The container should:
+      #   1. Stop accepting new requests
+      #   2. Finish in-flight requests
+      #   3. Close database connections
+      #   4. Exit cleanly
+      #
+      # If the container hasn't exited within terminationGracePeriodSeconds, Kubernetes
+      # sends SIGKILL (force kill). Set this higher for long-running jobs (e.g., ML inference).
+      # Default: 30 seconds. Set to 60+ for GPU workloads.
+      # ---------------------------------------------------------------------------
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+
+      # Image pull secrets are needed for private container registries (e.g., ghcr.io).
+      # The secret is created manually: kubectl create secret docker-registry ghcr-pull-secret ...
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
       containers:
         - name: {{ include "creatium-service.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          # IfNotPresent: don't re-pull the image if it's already cached on the node.
+          # Always: always pull (useful for 'latest' tags in dev — avoid in production).
+          # Never: only use the local cache (useful for air-gapped environments).
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
+            # Named port "http" — referenced by the Service and health probes below.
+            # Using a name instead of a number makes it easy to change the port
+            # without updating every place that references it.
             - name: http
               containerPort: {{ .Values.containerPort }}
               protocol: TCP
+
+          # -----------------------------------------------------------------------
+          # Liveness probe — "is this container alive?"
+          #
+          # Kubernetes calls this endpoint periodically. If it fails failureThreshold
+          # times in a row, Kubernetes kills the container and starts a new one.
+          #
+          # The liveness probe should check the process is running and not deadlocked.
+          # It should NOT check downstream dependencies (database, cache) — use the
+          # readiness probe for that. A liveness probe that fails when the database
+          # is down will cause unnecessary restarts.
+          #
+          # Typical implementation:
+          #   GET /health → 200 OK {"status": "ok"}
+          # -----------------------------------------------------------------------
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.liveness.path }}
               port: http
+            # Wait this long after container starts before checking — allows app startup time.
+            # Too low: pod gets killed before it finishes starting up.
+            # Too high: a crashed pod keeps getting traffic for too long.
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            # Check every N seconds.
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            # Fail the probe if the endpoint doesn't respond within N seconds.
             timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            # Restart the container after this many consecutive failures.
             failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
           {{- end }}
+
+          # -----------------------------------------------------------------------
+          # Readiness probe — "is this container ready to serve traffic?"
+          #
+          # Kubernetes calls this endpoint periodically. While it fails, the pod is
+          # removed from the Service's load balancer — no traffic is sent to it.
+          # Unlike the liveness probe, a failing readiness probe does NOT restart the pod.
+          #
+          # The readiness probe SHOULD check downstream dependencies:
+          #   - Can we reach the database?
+          #   - Is the cache warm?
+          #   - Have startup tasks completed?
+          #
+          # Typical implementation:
+          #   GET /ready → 200 OK when ready, 503 when not ready
+          #
+          # This is what enables zero-downtime rolling updates: Kubernetes waits for
+          # the new pod to pass the readiness probe before stopping the old pod.
+          # -----------------------------------------------------------------------
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
             httpGet:
@@ -57,9 +176,41 @@ spec:
             timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
             failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
           {{- end }}
+
+          # -----------------------------------------------------------------------
+          # Resource requests and limits
+          #
+          # requests = guaranteed resources. The scheduler uses these to find a node
+          #   with enough free capacity. A pod is never placed on a node that doesn't
+          #   have at least this much free.
+          #
+          # limits = ceiling. The container is killed (OOMKilled) if it exceeds
+          #   memory limits. CPU limits cause throttling (not kills).
+          #
+          # Best practice:
+          #   - Set requests based on actual P50 usage (from Grafana dashboards)
+          #   - Set limits to ~2-4x requests to allow for bursts
+          #   - Start conservative and tune up based on monitoring data
+          #   - Never set CPU limits to the same value as requests (causes unnecessary throttling)
+          # -----------------------------------------------------------------------
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
           env:
+            # -----------------------------------------------------------------------
+            # Non-secret environment variables from a ConfigMap
+            #
+            # The ConfigMap is created by configmap.yaml in this chart.
+            # Values come from the "config:" key in values.yaml:
+            #   config:
+            #     LOG_LEVEL: "info"
+            #     REDIS_URL: "redis://redis:6379"
+            #
+            # Why ConfigMap instead of direct env vars?
+            #   - ConfigMaps can be updated without redeploying (with projected volumes)
+            #   - They appear in kubectl describe pod, making debugging easier
+            #   - They're visible in the ArgoCD UI diff
+            # -----------------------------------------------------------------------
             {{- range $key, $value := .Values.config }}
             - name: {{ $key }}
               valueFrom:
@@ -67,6 +218,18 @@ spec:
                   name: {{ include "creatium-service.fullname" $ }}
                   key: {{ $key }}
             {{- end }}
+
+            # -----------------------------------------------------------------------
+            # Secret environment variables from Kubernetes Secrets
+            #
+            # Secrets are created manually with kubectl (never stored in Git).
+            # Values come from "secretRefs:" in values.yaml:
+            #   secretRefs:
+            #     - name: stripe-api-key      ← name of the K8s Secret object
+            #       key: STRIPE_API_KEY        ← key within the Secret
+            #
+            # The env var name in the container will be "STRIPE_API_KEY".
+            # -----------------------------------------------------------------------
             {{- range .Values.secretRefs }}
             - name: {{ .key }}
               valueFrom:
@@ -74,18 +237,59 @@ spec:
                   name: {{ .name }}
                   key: {{ .key }}
             {{- end }}
+
+          # -----------------------------------------------------------------------
+          # preStop hook — give load balancer time to deregister the pod
+          #
+          # When Kubernetes decides to stop a pod, it simultaneously:
+          #   (a) Sends SIGTERM to the container
+          #   (b) Removes the pod's IP from the Service endpoints
+          #
+          # The problem: (b) is not instantaneous. For a few seconds after SIGTERM,
+          # the load balancer (ingress-nginx) may still forward requests to this pod.
+          # If the app has already stopped accepting connections, those requests get 502.
+          #
+          # The fix: preStop sleeps for 5 seconds before SIGTERM is sent. This gives
+          # the load balancer time to stop routing to the pod before the app shuts down.
+          # Combined with terminationGracePeriodSeconds, the pod has:
+          #   5s (preStop sleep) + up to (terminationGracePeriodSeconds - 5)s for cleanup.
+          # -----------------------------------------------------------------------
           lifecycle:
             preStop:
               exec:
                 command: ["sleep", "5"]
+
+      # -----------------------------------------------------------------------
+      # Node selector — pin pods to a specific node pool
+      #
+      # The label "pool: general" is set on every node in the general pool by Terraform.
+      # Override per-service:
+      #   nodeSelector:
+      #     pool: compute    ← for ML workloads
+      #     pool: gpu        ← for GPU workloads (also needs a toleration)
+      # -----------------------------------------------------------------------
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      # Affinity allows more complex scheduling rules (e.g., spread pods across
+      # availability zones, or co-locate pods with their data). Not used by default.
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      # -----------------------------------------------------------------------
+      # Tolerations — allow scheduling on tainted nodes
+      #
+      # The GPU node pool has a taint: nvidia.com/gpu=present:NoSchedule
+      # Without a matching toleration, pods are repelled from GPU nodes.
+      # tts-microservice adds this toleration in its values.yaml to claim GPU nodes.
+      #
+      # Fluent Bit uses tolerations: [{operator: Exists}] to run on ALL nodes,
+      # including tainted ones (GPU, system).
+      # -----------------------------------------------------------------------
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

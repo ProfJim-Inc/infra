@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-service
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+  annotations:
+    # ArgoCD Image Updater — automatically updates the image tag when a new
+    # semver image is pushed to GHCR. Pin to semver to avoid accidental latest pulls.
+    argocd-image-updater.argoproj.io/image-list: demo=ghcr.io/profjim-inc/demo-service
+    argocd-image-updater.argoproj.io/demo.update-strategy: semver
+    argocd-image-updater.argoproj.io/demo.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/demo.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/write-back-method: git
+spec:
+  project: creatium
+
+  sources:
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/demo-service/values.yaml
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+    # PrometheusRule (4 alert rules) + AlertmanagerConfig (Slack routing)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/demo-service
+      directory:
+        include: "{alerts,alertmanager-config}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
