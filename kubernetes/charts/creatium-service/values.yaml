@@ -19,6 +19,10 @@ image:
   tag: "latest"
   pullPolicy: IfNotPresent
 
+# -- Image pull secrets for private registries (e.g. ghcr.io)
+imagePullSecrets: []
+  # - name: ghcr-pull-secret
+
 # -- Container port the application listens on
 containerPort: 3000
 
@@ -123,11 +127,15 @@ serviceMonitor:
   interval: 30s
 
 # -- Deployment strategy
+# GPU services must use Recreate (set strategy.type: Recreate in service values.yaml)
 strategy:
   type: RollingUpdate
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0    # Zero downtime for customer-facing services
+
+# -- Grace period before SIGKILL after SIGTERM. Increase for long-running jobs (e.g. GPU inference).
+terminationGracePeriodSeconds: 30
 
 # -- Service account
 serviceAccount:

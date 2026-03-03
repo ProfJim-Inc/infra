@@ -23,6 +23,15 @@ resource "linode_lke_node_pool" "this" {
   tags   = var.tags
   labels = var.labels
 
+  dynamic "taint" {
+    for_each = var.taints
+    content {
+      key    = taint.value.key
+      value  = taint.value.value
+      effect = taint.value.effect
+    }
+  }
+
   lifecycle {
     ignore_changes = [node_count]
   }

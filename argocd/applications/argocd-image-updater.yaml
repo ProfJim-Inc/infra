@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-image-updater
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+spec:
+  project: creatium
+
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argocd-image-updater
+    targetRevision: "0.x"
+    helm:
+      values: |
+        # Run on system nodes alongside ArgoCD itself
+        nodeSelector:
+          pool: system
+
+        # Write image tag updates back to git (GitOps — no in-cluster state drift)
+        config:
+          argocd:
+            serverAddress: argocd-server.argocd.svc.cluster.local
+            insecure: true
+            plaintext: true
+
+          # Log level: info in production, debug when troubleshooting
+          logLevel: info
+
+        # Git write-back credentials — must be pre-created:
+        #   kubectl create secret generic argocd-image-updater-secret \
+        #     -n argocd \
+        #     --from-literal=username=<github-user> \
+        #     --from-literal=password=<github-pat>   (needs repo write access to infra repo)
+        authScripts:
+          enabled: false
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
