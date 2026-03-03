@@ -1,48 +1,65 @@
-# tts-microservice — compute-heavy service
+# tts-microservice — GPU-accelerated TTS inference (Kokoro)
 nameOverride: tts-microservice
 
 image:
   repository: ghcr.io/creatium/tts-microservice
   tag: "latest"
 
-containerPort: 8000
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# Port 9000 — hardcoded in Dockerfile.api and uvicorn entrypoint
+containerPort: 9000
 
 resources:
   requests:
-    cpu: 500m
-    memory: 1Gi
-  limits:
     cpu: 2000m
-    memory: 4Gi
+    memory: 8Gi
+    nvidia.com/gpu: "1"
+  limits:
+    cpu: 4000m
+    memory: 16Gi
+    nvidia.com/gpu: "1"
 
 probes:
   liveness:
     enabled: true
     path: /health
-    initialDelaySeconds: 30
+    initialDelaySeconds: 30    # Model is baked into image; startup ~15s
     periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
   readiness:
     enabled: true
-    path: /ready
+    path: /readiness            # FastAPI route is /readiness not /ready
     initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
 
+# GPU pods must use Recreate — RollingUpdate would require 2 GPUs simultaneously.
+strategy:
+  type: Recreate
+
+# Allow in-flight WS synthesis to finish before pod is killed.
+terminationGracePeriodSeconds: 60
+
+# GPU nodes are expensive — no autoscaling, fixed 1 replica
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilization: 60
-  targetMemoryUtilization: 70
+  enabled: false
+
+replicaCount: 1
 
 ingress:
-  enabled: false  # Internal service, accessed via ClusterIP
+  enabled: false  # Internal service, called by agent-backend via ClusterIP
 
-# Runs on compute pool — heavier workload
+# GPU node pool — tainted with nvidia.com/gpu=present:NoSchedule
 nodeSelector:
-  pool: compute
+  pool: gpu
 
 tolerations:
-  - key: workload
-    value: compute
+  - key: nvidia.com/gpu
+    operator: Exists
     effect: NoSchedule
 
 commonLabels:
@@ -53,3 +70,26 @@ commonLabels:
 serviceMonitor:
   enabled: true
   path: /metrics
+
+config:
+  KOKORO_OPENSEARCH_LOGGING: "true"
+  KOKORO_OPENSEARCH_INDEX: "tts-logs"
+  OPENSEARCH_HOST: "opensearch-cluster-master.logging.svc.cluster.local"
+  OPENSEARCH_PORT: "9200"
+  OPENSEARCH_USE_SSL: "false"
+  KOKORO_TF32: "true"
+  KOKORO_MAX_CONNECTIONS: "50"
+
+# Secrets must be pre-created as K8s Secrets:
+#   kubectl create secret generic tts-secrets -n production \
+#     --from-literal=KOKORO_API_KEY=<key> \
+#     --from-literal=AZURE_STORAGE_CONNECTION_STRING=<conn-string>
+secretRefs:
+  - name: tts-secrets
+    key: KOKORO_API_KEY
+  - name: tts-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: tts-secrets
+    key: OPENSEARCH_USER
+  - name: tts-secrets
+    key: OPENSEARCH_PASS
