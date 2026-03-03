@@ -54,6 +54,8 @@ spec:
       kind: ValidatingWebhookConfiguration
     - group: networking.k8s.io
       kind: IngressClass
+    - group: keda.sh
+      kind: ClusterTriggerAuthentication
 
   namespaceResourceWhitelist:
     - group: ""

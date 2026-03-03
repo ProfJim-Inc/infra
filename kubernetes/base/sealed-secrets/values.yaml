@@ -3,6 +3,8 @@
 # Cluster-wide secret decryption controller
 # =============================================================================
 
+fullNameOverride: sealed-secrets-controller
+
 nodeSelector:
   pool: system
 
