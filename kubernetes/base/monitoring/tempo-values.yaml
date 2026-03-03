@@ -1,0 +1,58 @@
+# =============================================================================
+# Grafana Tempo — monolithic mode, system pool
+# Receives OTLP traces from the OTeL Collector and serves them to Grafana.
+# =============================================================================
+
+tempo:
+  repository: grafana/tempo
+  pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  # Trace storage: local filesystem backed by a PVC
+  # Upgrade to object storage (Linode Object Storage) when trace volume grows
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+
+  # Receivers: accept OTLP (gRPC + HTTP) from the OTeL Collector
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+  # Retention: 72 hours (3 days) — extend once storage is confirmed healthy
+  retention: 72h
+
+# Persistent storage for traces and WAL
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+# Pin to system pool — traces are platform infrastructure
+nodeSelector:
+  pool: system
+
+service:
+  type: ClusterIP
+  port: 3100
+
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 30s

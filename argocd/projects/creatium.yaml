@@ -33,6 +33,8 @@ spec:
     - "https://fluent.github.io/helm-charts"
     - "https://kubernetes.github.io/ingress-nginx"
     - "https://nvidia.github.io/k8s-device-plugin"
+    - "https://grafana.github.io/helm-charts"
+    - "https://open-telemetry.github.io/opentelemetry-helm-charts"
 
   # Allow these Kubernetes resource types
   clusterResourceWhitelist:

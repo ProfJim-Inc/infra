@@ -39,6 +39,39 @@ grafana:
       cpu: 500m
       memory: 512Mi
 
+  # Install the OpenSearch datasource plugin (community plugin, not bundled)
+  plugins:
+    - grafana-opensearch-datasource
+
+  # Pre-configured datasources: OpenSearch (logs) and Tempo (traces)
+  additionalDataSources:
+    - name: OpenSearch
+      type: grafana-opensearch-datasource
+      access: proxy
+      url: http://opensearch-cluster-master.logging.svc.cluster.local:9200
+      jsonData:
+        database: "logs-*"
+        flavor: "opensearch"
+        version: "2.0.0"
+        timeField: "@timestamp"
+        logLevelField: "level"
+        logMessageField: "log"
+      isDefault: false
+
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.monitoring.svc.cluster.local:3100
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: OpenSearch
+          tags:
+            - key: "app"
+            - key: "namespace"
+        serviceMap:
+          datasourceUid: prometheus
+      isDefault: false
+
   # Pre-load dashboards for our services
   sidecar:
     dashboards:

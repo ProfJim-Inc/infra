@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+spec:
+  project: creatium
+
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: tempo
+      targetRevision: "1.x"
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/monitoring/tempo-values.yaml
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

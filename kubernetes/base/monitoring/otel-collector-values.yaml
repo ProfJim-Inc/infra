@@ -1,0 +1,96 @@
+# =============================================================================
+# OpenTelemetry Collector — central telemetry gateway
+# Deployed as a Deployment (not DaemonSet) with a stable ClusterIP Service.
+# Applications send OTLP traces/metrics to: otel-collector.monitoring:4317 (gRPC)
+#                                        or: otel-collector.monitoring:4318 (HTTP)
+# =============================================================================
+
+mode: deployment
+replicaCount: 1
+
+nameOverride: otel-collector
+
+nodeSelector:
+  pool: system
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Expose OTLP ports so application pods can push telemetry
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+    appProtocol: grpc
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  metrics:
+    enabled: true
+    containerPort: 8889
+    servicePort: 8889
+    protocol: TCP
+
+# Collector pipeline configuration
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+  processors:
+    memory_limiter:
+      # Prevents OOM by dropping telemetry when memory pressure is high
+      limit_mib: 400
+      spike_limit_mib: 100
+      check_interval: 5s
+    batch:
+      # Batches spans/metrics for efficient export — reduces network overhead
+      timeout: 5s
+      send_batch_size: 512
+
+  exporters:
+    # Traces → Grafana Tempo (OTLP gRPC)
+    otlp/tempo:
+      endpoint: "tempo.monitoring.svc.cluster.local:4317"
+      tls:
+        insecure: true
+
+    # Metrics → exposed as Prometheus /metrics for kube-prometheus-stack to scrape
+    prometheus:
+      endpoint: "0.0.0.0:8889"
+      namespace: "otel"
+
+    # Debug logging (set to 'none' in production once pipeline is validated)
+    debug:
+      verbosity: basic
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/tempo]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [prometheus]
+
+# Prometheus will scrape the collector's own /metrics endpoint
+serviceMonitor:
+  enabled: true
+  metricsEndpoints:
+    - port: metrics
+      interval: 30s
