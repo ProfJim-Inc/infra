@@ -6,6 +6,34 @@ metadata:
   labels:
     team: backend
     tier: customer-facing
+  annotations:
+    # ── ArgoCD Image Updater ────────────────────────────────────────────────
+    # Watches ghcr.io/creatium/tts-microservice for new semver tags (e.g. 1.2.3).
+    # When a newer tag is found, writes it back to the values file in git and
+    # ArgoCD auto-syncs the new image — fully GitOps, no manual tag bumps.
+    #
+    # Pre-requisites (one-time, per cluster):
+    #   1. argocd-image-updater must be installed (see argocd/applications/argocd-image-updater.yaml)
+    #   2. A git write-back secret must exist in the argocd namespace:
+    #        kubectl create secret generic argocd-image-updater-secret \
+    #          -n argocd \
+    #          --from-literal=username=<github-user> \
+    #          --from-literal=password=<github-pat>   (needs repo write access)
+    #   3. ghcr-pull-secret must exist in the argocd namespace (for registry auth):
+    #        kubectl create secret docker-registry ghcr-pull-secret \
+    #          -n argocd \
+    #          --docker-server=ghcr.io \
+    #          --docker-username=<github-user> \
+    #          --docker-password=<github-pat>
+    argocd-image-updater.argoproj.io/image-list: tts=ghcr.io/creatium/tts-microservice
+    argocd-image-updater.argoproj.io/tts.update-strategy: semver
+    argocd-image-updater.argoproj.io/tts.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/tts.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/tts.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/tts.pull-secret: pullsecret:argocd/ghcr-pull-secret
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/write-back-target: "helmvalues:kubernetes/base/tts-microservice/values.yaml"
+    argocd-image-updater.argoproj.io/git-branch: main
 spec:
   project: creatium
 

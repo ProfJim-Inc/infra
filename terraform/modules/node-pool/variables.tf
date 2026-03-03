@@ -45,3 +45,13 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "taints" {
+  description = "Kubernetes taints to apply to all nodes in the pool"
+  type = list(object({
+    key    = string
+    value  = string
+    effect = string
+  }))
+  default = []
+}

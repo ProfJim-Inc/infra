@@ -38,10 +38,10 @@ module "cluster" {
 
   cluster_name       = "creatium-us"
   k8s_version        = "1.34"
-  region             = "us-east"
+  region             = "us-ord"
   default_pool_type  = "g6-standard-2"
   default_pool_count = 1  # TODO: restore to 2 after limit increase
-  tags               = ["creatium", "production", "us-east"]
+  tags               = ["creatium", "production", "us-ord"]
 }
 
 # -----------------------------------------------
@@ -72,6 +72,23 @@ module "compute_pool" {
   max_nodes          = 5
   tags               = ["pool:compute", "creatium"]
   labels             = { pool = "compute" }
+}
+
+# GPU pool: TTS inference (NVIDIA RTX 6000, fixed size — expensive, don't autoscale)
+module "gpu_pool" {
+  source = "../../modules/node-pool"
+
+  cluster_id         = module.cluster.cluster_id
+  instance_type      = "g1-gpu-rtx4000-2"    
+  autoscaler_enabled = false
+  node_count         = 1
+  tags               = ["pool:gpu", "creatium"]
+  labels             = { pool = "gpu" }
+  taints = [{
+    key    = "nvidia.com/gpu"
+    value  = "present"
+    effect = "NoSchedule"
+  }]
 }
 
 # System pool: monitoring, ArgoCD, ingress (fixed size)

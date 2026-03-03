@@ -24,7 +24,11 @@ spec:
         {{- include "creatium-service.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "creatium-service.serviceAccountName" . }}
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ include "creatium-service.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
