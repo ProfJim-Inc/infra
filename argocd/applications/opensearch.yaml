@@ -19,6 +19,12 @@ spec:
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
       ref: values
+    # PostSync Job: creates ISM retention policy + per-service index template
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/logging
+      directory:
+        include: "opensearch-setup-job.yaml"
 
   destination:
     server: https://kubernetes.default.svc

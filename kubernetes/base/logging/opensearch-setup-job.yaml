@@ -1,0 +1,116 @@
+# =============================================================================
+# OpenSearch Setup Job
+# Runs once to create:
+#   1. ISM policy — deletes indices older than 30 days (no rollover: Fluent Bit
+#      writes directly to date-named indices, providing daily rotation already)
+#   2. Index template — field mappings for all logs-* indices
+# Both operations are idempotent PUTs — safe to re-run on cluster rebuild.
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensearch-setup
+  namespace: logging
+  annotations:
+    # Ensures this job re-runs on every ArgoCD sync (PostSync hook)
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        pool: system
+      containers:
+        - name: opensearch-setup
+          image: curlimages/curl:8.6.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              OPENSEARCH="http://opensearch-cluster-master.logging.svc.cluster.local:9200"
+
+              echo "==> Waiting for OpenSearch to be ready..."
+              until curl -sf "$OPENSEARCH/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+                echo "    OpenSearch not ready, retrying in 5s..."
+                sleep 5
+              done
+
+              # ISM policy: delete indices older than 30 days.
+              #
+              # No rollover action is used here. Rollover requires a write alias
+              # (Fluent Bit writes to the alias; ISM creates new backing indices and
+              # repoints the alias on rollover). Our Fluent Bit pipeline writes
+              # directly to date-named indices (logs-<service>-YYYY.MM.DD), which
+              # already provides daily rotation — rollover would fail silently because
+              # there is no alias backing these indices.
+              echo "==> Creating ISM retention policy (30-day delete)..."
+              curl -sf -X PUT "$OPENSEARCH/_plugins/_ism/policies/creatium-logs-policy" \
+                -H 'Content-Type: application/json' \
+                -d '{
+                  "policy": {
+                    "description": "Creatium logs: delete indices older than 30 days",
+                    "default_state": "live",
+                    "states": [
+                      {
+                        "name": "live",
+                        "actions": [],
+                        "transitions": [
+                          {
+                            "state_name": "delete",
+                            "conditions": {
+                              "min_index_age": "30d"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "delete",
+                        "actions": [{ "delete": {} }],
+                        "transitions": []
+                      }
+                    ],
+                    "ism_template": [
+                      {
+                        "index_patterns": ["logs-*"],
+                        "priority": 100
+                      }
+                    ]
+                  }
+                }' && echo "" && echo "    ISM policy applied."
+
+              echo "==> Creating per-service index template (logs-*)..."
+              curl -sf -X PUT "$OPENSEARCH/_index_template/creatium-logs-template" \
+                -H 'Content-Type: application/json' \
+                -d '{
+                  "index_patterns": ["logs-*"],
+                  "priority": 200,
+                  "template": {
+                    "settings": {
+                      "number_of_shards": 1,
+                      "number_of_replicas": 1
+                    },
+                    "mappings": {
+                      "properties": {
+                        "@timestamp":           { "type": "date" },
+                        "log":                  { "type": "text" },
+                        "level":                { "type": "keyword" },
+                        "stream":               { "type": "keyword" },
+                        "_index":               { "type": "keyword" },
+                        "kubernetes": {
+                          "properties": {
+                            "namespace_name":   { "type": "keyword" },
+                            "pod_name":         { "type": "keyword" },
+                            "container_name":   { "type": "keyword" },
+                            "host":             { "type": "keyword" },
+                            "labels":           { "type": "object", "dynamic": true }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }' && echo "" && echo "    Index template applied."
+
+              echo "==> OpenSearch setup complete."

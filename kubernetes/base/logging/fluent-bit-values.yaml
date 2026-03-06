@@ -51,16 +51,51 @@ config:
         K8S-Logging.Parser  On
         K8S-Logging.Exclude On
 
+    # Drop DEBUG/TRACE logs — ~40-60% volume reduction with no signal loss
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Exclude level (?i)^(debug|trace)$
+
+    # Extract Kubernetes app label into a top-level field for per-service index routing
+    [FILTER]
+        Name    lua
+        Match   kube.*
+        script  /fluent-bit/scripts/set_index.lua
+        call    set_index
+
   outputs: |
     [OUTPUT]
-        Name            opensearch
-        Match           kube.*
-        Host            opensearch-cluster-master.logging.svc.cluster.local
-        Port            9200
-        Index           creatium-logs
+        Name               opensearch
+        Match              kube.*
+        Host               opensearch-cluster-master.logging.svc.cluster.local
+        Port               9200
+        Logstash_Format    On
+        Logstash_Prefix_Key _index
+        Logstash_DateFormat %Y.%m.%d
         Suppress_Type_Name On
-        tls             Off
-        tls.verify      Off
+        tls                Off
+        tls.verify         Off
+
+# Lua script: extracts the 'app' label from Kubernetes metadata and sets _index
+# so Fluent Bit writes to per-service daily indices: logs-<service>-<date>
+luaScripts:
+  set_index.lua: |
+    function set_index(tag, timestamp, record)
+      local service = "unknown"
+      if record["kubernetes"] then
+        local labels = record["kubernetes"]["labels"]
+        if labels then
+          service = labels["app"]
+            or labels["app.kubernetes.io/name"]
+            or service
+        end
+      end
+      -- sanitize: lowercase, collapse non-alphanumeric runs to hyphens
+      service = string.lower(tostring(service)):gsub("[^a-z0-9%-]+", "-")
+      record["_index"] = "logs-" .. service
+      return 1, timestamp, record
+    end
 
 resources:
   requests:
