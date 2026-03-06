@@ -1,0 +1,145 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: equiphon
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: equiphon
+spec:
+  groups:
+    - name: equiphon.availability
+      interval: 30s
+      rules:
+        - alert: EquiphonDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"equiphon.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon has no running pods"
+            description: >-
+              All equiphon replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/equiphon -n production"
+
+        - alert: EquiphonPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"equiphon-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: equiphon.slos
+      interval: 30s
+      rules:
+        - alert: EquiphonHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", pod=~"equiphon-.*", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", pod=~"equiphon-.*"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx over the last 5 minutes.
+
+        - alert: EquiphonHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production", pod=~"equiphon-.*"}[5m])
+              ) by (le, handler)
+            ) > 2.0
+          for: 5m
+          labels:
+            severity: warning
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon P99 latency above 2 seconds"
+            description: >-
+              P99 latency for handler {{ $labels.handler }} is {{ $value | humanizeDuration }}.
+
+    - name: equiphon.business
+      interval: 60s
+      rules:
+        - alert: EquiphonHighConversionWarningRate
+          expr: |
+            (
+              rate(equiphon_conversion_warnings_total[5m])
+              /
+              rate(equiphon_conversions_total[5m])
+            ) > 0.10
+          for: 3m
+          labels:
+            severity: warning
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon conversion warning rate above 10%"
+            description: >-
+              {{ $value | humanizePercentage }} of conversions are producing warnings
+              (domain parser errors or general-language fallbacks) over the last 5 minutes.
+
+        - alert: EquiphonSlowConversionP95
+          expr: |
+            histogram_quantile(
+              0.95,
+              rate(equiphon_conversion_duration_seconds_bucket[5m])
+            ) > 1.0
+          for: 5m
+          labels:
+            severity: warning
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon G2P conversion P95 above 1 second"
+            description: >-
+              95th percentile PhonemeGenerator.convert() time is {{ $value | humanizeDuration }}.
+              Check for unusually long inputs or domain parser regression.
+
+        - alert: EquiphonConversionRateDrop
+          expr: |
+            (
+              rate(equiphon_conversions_total[5m])
+              /
+              rate(equiphon_conversions_total[30m] offset 5m)
+            ) < 0.5
+          for: 5m
+          labels:
+            severity: warning
+            service: equiphon
+            namespace: production
+          annotations:
+            summary: "equiphon conversion rate dropped by more than 50%"
+            description: >-
+              Conversion throughput is less than half of the 30-minute baseline.
+              May indicate upstream caller issues or service degradation.

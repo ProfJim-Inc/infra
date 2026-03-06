@@ -1,0 +1,210 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: equiphon-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  equiphon.json: |
+    {
+      "title": "Equiphon G2P API",
+      "uid": "equiphon",
+      "tags": ["equiphon", "g2p", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Request Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{pod=~\"equiphon-.*\"}[2m])) by (handler)",
+            "legendFormat": "{{ handler }}"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Error Rate (5xx)",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "error rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{pod=~\"equiphon-.*\", status_code=~\"5..\"}[2m])) / sum(rate(http_requests_total{pod=~\"equiphon-.*\"}[2m]))",
+            "legendFormat": "error rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "Latency Percentiles (HTTP)",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{pod=~\"equiphon-.*\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{pod=~\"equiphon-.*\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{pod=~\"equiphon-.*\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Running Pods",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 1 },
+                { "color": "green", "value": 2 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"equiphon\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        { "type": "row", "title": "G2P Performance", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 5, "type": "timeseries", "title": "Conversion Rate by Domain",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(equiphon_conversions_total[2m])) by (domain)",
+            "legendFormat": "{{ domain }}"
+          }]
+        },
+
+        {
+          "id": 6, "type": "timeseries", "title": "Conversion Duration Percentiles",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(equiphon_conversion_duration_seconds_bucket[5m])) by (le, domain))", "legendFormat": "p50 {{ domain }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(equiphon_conversion_duration_seconds_bucket[5m])) by (le, domain))", "legendFormat": "p95 {{ domain }}" },
+            { "expr": "histogram_quantile(0.99, sum(rate(equiphon_conversion_duration_seconds_bucket[5m])) by (le, domain))", "legendFormat": "p99 {{ domain }}" }
+          ]
+        },
+
+        {
+          "id": 7, "type": "timeseries", "title": "Input Length Distribution (p50/p95/p99)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "displayName": "chars" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(equiphon_input_length_chars_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(equiphon_input_length_chars_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(equiphon_input_length_chars_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        { "type": "row", "title": "Business Insights", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 8, "type": "piechart", "title": "Domain Detection Breakdown",
+          "gridPos": { "h": 7, "w": 6, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "sum(increase(equiphon_domain_detections_total[1h])) by (domain)",
+            "legendFormat": "{{ domain }}"
+          }]
+        },
+
+        {
+          "id": 9, "type": "timeseries", "title": "Conversion Warnings Rate",
+          "gridPos": { "h": 7, "w": 6, "x": 6, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(equiphon_conversion_warnings_total[5m])) by (reason)",
+            "legendFormat": "{{ reason }}"
+          }]
+        },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Batch Size Distribution (p50/p99)",
+          "gridPos": { "h": 7, "w": 6, "x": 12, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(equiphon_batch_size_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.99, sum(rate(equiphon_batch_size_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "LaTeX Input Rate",
+          "gridPos": { "h": 7, "w": 6, "x": 18, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "rate(equiphon_latex_conversions_total[2m])",
+            "legendFormat": "latex inputs/s"
+          }]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "collapsed": false },
+
+        {
+          "id": 12, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"equiphon-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 13, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"equiphon-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 14, "type": "timeseries", "title": "HPA Replica Count",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            { "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"production\", horizontalpodautoscaler=\"equiphon\"}", "legendFormat": "current" },
+            { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"production\", horizontalpodautoscaler=\"equiphon\"}", "legendFormat": "desired" },
+            { "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"production\", horizontalpodautoscaler=\"equiphon\"}", "legendFormat": "max" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }, "collapsed": false },
+
+        {
+          "id": 15, "type": "logs", "title": "equiphon Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 31 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:equiphon*",
+            "queryType": "lucene",
+            "timeField": "@timestamp"
+          }]
+        }
+      ]
+    }
