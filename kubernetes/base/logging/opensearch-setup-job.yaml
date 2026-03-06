@@ -1,6 +1,9 @@
 # =============================================================================
 # OpenSearch Setup Job
-# Runs once to create the ISM retention policy and per-service index template.
+# Runs once to create:
+#   1. ISM policy — deletes indices older than 30 days (no rollover: Fluent Bit
+#      writes directly to date-named indices, providing daily rotation already)
+#   2. Index template — field mappings for all logs-* indices
 # Both operations are idempotent PUTs — safe to re-run on cluster rebuild.
 # =============================================================================
 apiVersion: batch/v1
@@ -35,24 +38,25 @@ spec:
                 sleep 5
               done
 
-              echo "==> Creating ISM retention policy (30-day delete, 7-day/5GB rollover)..."
+              # ISM policy: delete indices older than 30 days.
+              #
+              # No rollover action is used here. Rollover requires a write alias
+              # (Fluent Bit writes to the alias; ISM creates new backing indices and
+              # repoints the alias on rollover). Our Fluent Bit pipeline writes
+              # directly to date-named indices (logs-<service>-YYYY.MM.DD), which
+              # already provides daily rotation — rollover would fail silently because
+              # there is no alias backing these indices.
+              echo "==> Creating ISM retention policy (30-day delete)..."
               curl -sf -X PUT "$OPENSEARCH/_plugins/_ism/policies/creatium-logs-policy" \
                 -H 'Content-Type: application/json' \
                 -d '{
                   "policy": {
-                    "description": "Creatium logs: rollover at 5GB or 7 days, delete at 30 days",
-                    "default_state": "hot",
+                    "description": "Creatium logs: delete indices older than 30 days",
+                    "default_state": "live",
                     "states": [
                       {
-                        "name": "hot",
-                        "actions": [
-                          {
-                            "rollover": {
-                              "min_size": "5gb",
-                              "min_index_age": "7d"
-                            }
-                          }
-                        ],
+                        "name": "live",
+                        "actions": [],
                         "transitions": [
                           {
                             "state_name": "delete",
@@ -86,8 +90,7 @@ spec:
                   "template": {
                     "settings": {
                       "number_of_shards": 1,
-                      "number_of_replicas": 1,
-                      "plugins.index_state_management.rollover_alias": "logs-alias"
+                      "number_of_replicas": 1
                     },
                     "mappings": {
                       "properties": {
