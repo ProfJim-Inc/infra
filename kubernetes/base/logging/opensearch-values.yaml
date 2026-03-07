@@ -17,8 +17,8 @@ config:
     plugins.security.disabled: true
     # Raise indexing pressure limit from default 10% to 25% of JVM heap (~250MB).
     # Default 10% (~100MB) causes 429s when Fluent Bit sends large bulk payloads.
-    # OpenSearch expects a decimal ratio (not "25%") in opensearch.yml
-    indexing_pressure.memory.limit: 0.25
+    # Must be a percentage string — decimal (0.25) and bare number are rejected.
+    indexing_pressure.memory.limit: "25%"
 
 extraEnvs:
   - name: DISABLE_INSTALL_DEMO_CONFIG
