@@ -1,0 +1,88 @@
+# =============================================================================
+# equiphon — Grapheme-to-Phoneme (G2P) conversion API (FastAPI)
+# Converts text (chemistry, math, general) to IPA phonemes
+# =============================================================================
+nameOverride: equiphon
+
+image:
+  repository: ghcr.io/profjim-inc/equiphon
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 5324
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi   # PhonemeGenerator loads dictionaries at startup
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15    # allow time for dictionary loading
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /ready               # /ready calls _generator.convert("test") to verify model
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5          # G2P conversion can be slightly slow on first call
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0   # zero-downtime: new pod must be ready before old is killed
+
+terminationGracePeriodSeconds: 15
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  host: equiphon.creatium.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+  tls:
+    - secretName: equiphon-tls
+      hosts:
+        - equiphon.creatium.com
+
+# General pool — dictionary-based API, no GPU or dedicated compute needed
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: platform
+  tier: internal
+  cost-center: engineering
+
+# Prometheus ServiceMonitor — scrapes /metrics every 15s
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+# Non-sensitive config — injected as environment variables via ConfigMap
+config:
+  ENV: "production"
+  SERVICE_NAME: "equiphon"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+
+# No secrets needed — equiphon has no external dependencies
+secretRefs: []
