@@ -1,0 +1,15 @@
+# Web framework
+fastapi==0.115.4
+uvicorn[standard]==0.32.1
+pydantic==2.10.2
+
+# Prometheus metrics — auto-instruments all FastAPI routes, exposes /metrics
+prometheus-fastapi-instrumentator==7.0.0
+prometheus-client==0.21.1
+
+# OpenTelemetry — traces to OTeL Collector → Grafana Tempo
+opentelemetry-api==1.28.0
+opentelemetry-sdk==1.28.0
+opentelemetry-exporter-otlp-proto-grpc==1.28.0
+opentelemetry-instrumentation-fastapi==0.49b0
+opentelemetry-instrumentation-httpx==0.49b0

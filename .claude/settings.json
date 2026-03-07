@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/viditbhatia/equiphon_framework/**)",
+      "Read(//Users/viditbhatia/Development/creatium/git/equiphon_framework/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/viditbhatia/Development/creatium/git/infra/.claude/skills/sre-k8s",
+      "/Users/viditbhatia/Development/creatium/git/equiphon_framework/equiphon",
+      "/Users/viditbhatia/Development/creatium/git/equiphon_framework"
+    ]
+  }
+}

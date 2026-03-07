@@ -33,3 +33,8 @@ jobs:
         run: |
           helm lint kubernetes/charts/creatium-service/ \
             -f kubernetes/base/tts-microservice/values.yaml
+
+      - name: Lint with demo-service values
+        run: |
+          helm lint kubernetes/charts/creatium-service/ \
+            -f kubernetes/base/demo-service/values.yaml

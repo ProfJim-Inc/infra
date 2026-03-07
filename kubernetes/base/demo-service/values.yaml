@@ -1,0 +1,92 @@
+# =============================================================================
+# demo-service — Infrastructure showcase (FastAPI)
+# Demonstrates: OTeL traces → Tempo, Prometheus metrics, structured JSON logs
+# =============================================================================
+nameOverride: demo-service
+
+image:
+  repository: ghcr.io/profjim-inc/demo-service
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /readiness
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0   # Zero-downtime: always bring new pod up before killing old one
+
+# 15s gives in-flight requests time to complete before the pod is killed
+terminationGracePeriodSeconds: 15
+
+# Min 2 replicas for HA; autoscale up to 6 under load
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# demo-service is externally accessible at demo.creatium.com
+ingress:
+  enabled: true
+  className: nginx
+  host: demo.creatium.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+  tls:
+    enabled: true
+    secretName: demo-tls
+
+# General pool — standard APIs and web services
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: platform
+  tier: internal
+  cost-center: engineering
+
+# Prometheus ServiceMonitor — scrapes /metrics every 15s
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+# Non-sensitive config — injected as environment variables via ConfigMap
+config:
+  ENV: "production"
+  SERVICE_NAME: "demo-service"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  # OTeL Collector endpoint — traces are sent here and forwarded to Tempo
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  POOL: "general"
+
+# No secrets needed for the demo service
+secretRefs: []
