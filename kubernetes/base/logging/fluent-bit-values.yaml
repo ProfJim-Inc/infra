@@ -76,7 +76,6 @@ config:
         Logstash_Prefix_Key flb_index
         Logstash_DateFormat %Y.%m.%d
         Suppress_Type_Name On
-        Trace_Error        On
         tls                Off
         tls.verify         Off
 
