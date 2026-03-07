@@ -58,9 +58,8 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
   tls:
-    - secretName: equiphon-tls
-      hosts:
-        - equiphon.creatium.com
+    enabled: true
+    secretName: equiphon-tls
 
 # General pool — dictionary-based API, no GPU or dedicated compute needed
 nodeSelector:
