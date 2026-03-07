@@ -123,6 +123,31 @@ Developer                    GitHub                      Cluster
 - No "snowflake" clusters that differ from what's documented
 - New team members can understand the entire system by reading this repo
 
+### Observability stack
+
+```
+Applications (OTLP traces/metrics)
+        │
+        ▼
+OTeL Collector ──── traces ──→ Grafana Tempo ──→ Grafana (trace view)
+        │
+        └─── metrics ──→ Prometheus ──────────→ Grafana (dashboards)
+
+Fluent Bit (DaemonSet)
+  ├── filters: drop DEBUG/TRACE, extract service name via Lua
+  └── output: OpenSearch  logs-<service>-YYYY.MM.DD  ──→ Grafana (log view)
+                 └── ISM policy: rollover 7d/5GB, delete 30d
+```
+
+| Component | Purpose | Namespace |
+| --- | --- | --- |
+| kube-prometheus-stack | Prometheus + Grafana + Alertmanager | monitoring |
+| Grafana Tempo | Distributed trace storage (OTLP in, TraceQL out) | monitoring |
+| OTeL Collector | OTLP gateway — routes traces to Tempo, metrics to Prometheus | monitoring |
+| OpenSearch | Log storage with per-service daily indices | logging |
+| Fluent Bit | Log collection DaemonSet — ships all node logs to OpenSearch | logging |
+| OpenSearch Dashboards | Log exploration UI at `https://logs.creatium.com` | logging |
+
 ---
 
 ## Repository Structure
@@ -136,9 +161,7 @@ Developer                    GitHub                      Cluster
 │   └── demo-service.yml           # Builds and deploys the demo-service
 │
 ├── argocd/
-│   ├── projects/
-│   │   └── creatium.yaml          # AppProject: defines what repos/namespaces ArgoCD
-│   │                              #   can touch — acts as a security boundary
+│   ├── projects/creatium.yaml      # ArgoCD AppProject — namespace + repo allowlist
 │   └── applications/
 │       ├── kube-prometheus-stack.yaml   # Metrics + Grafana + Alertmanager
 │       ├── tempo.yaml                   # Distributed trace storage
@@ -152,53 +175,44 @@ Developer                    GitHub                      Cluster
 │       ├── demo-service.yaml            # The demo FastAPI service
 │       ├── agent-backend.yaml
 │       ├── agent-frontend.yaml
-│       └── tts-microservice.yaml
+│       ├── tts-microservice.yaml
+│       ├── kube-prometheus-stack.yaml
+│       ├── tempo.yaml              # Distributed trace storage
+│       ├── otel-collector.yaml     # OTLP telemetry gateway
+│       ├── opensearch.yaml
+│       ├── opensearch-dashboards.yaml
+│       ├── fluent-bit.yaml
+│       ├── ingress-nginx.yaml
+│       ├── nvidia-device-plugin.yaml
+│       └── argocd-image-updater.yaml
 │
 ├── kubernetes/
-│   ├── charts/
-│   │   └── creatium-service/      # A single shared Helm chart for ALL services.
-│   │       │                      #   Each service provides its own values.yaml.
-│   │       │                      #   This avoids copy-pasting Deployment/Service/Ingress
-│   │       │                      #   boilerplate for every service.
-│   │       ├── Chart.yaml
-│   │       ├── values.yaml        # Defaults — safe starting point for any service
-│   │       └── templates/
-│   │           ├── deployment.yaml     # The main workload
-│   │           ├── service.yaml        # ClusterIP service (internal routing)
-│   │           ├── ingress.yaml        # Public HTTPS entry point (optional)
-│   │           ├── hpa.yaml            # Horizontal Pod Autoscaler
-│   │           ├── pdb.yaml            # Pod Disruption Budget (availability guarantee)
-│   │           ├── configmap.yaml      # Non-secret environment variables
-│   │           ├── serviceaccount.yaml # K8s RBAC identity for the pod
-│   │           └── servicemonitor.yaml # Tells Prometheus how to scrape this service
-│   │
+│   ├── charts/creatium-service/    # Shared Helm chart for all services
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml             # Defaults — override per service
+│   │   └── templates/
+│   │       ├── deployment.yaml
+│   │       ├── service.yaml
+│   │       ├── ingress.yaml
+│   │       ├── hpa.yaml
+│   │       ├── pdb.yaml
+│   │       ├── configmap.yaml
+│   │       ├── serviceaccount.yaml
+│   │       └── servicemonitor.yaml
 │   └── base/
-│       ├── agent-backend/values.yaml        # Backend API overrides
-│       ├── agent-frontend/values.yaml       # Frontend overrides
-│       ├── tts-microservice/values.yaml     # TTS (GPU) overrides
-│       ├── demo-service/
-│       │   ├── values.yaml                  # Demo service overrides
-│       │   ├── alerts.yaml                  # PrometheusRule — 4 alert definitions
-│       │   └── alertmanager-config.yaml     # Slack routing for those alerts
+│       ├── agent-backend/values.yaml
+│       ├── agent-frontend/values.yaml
+│       ├── tts-microservice/values.yaml
 │       ├── monitoring/
-│       │   ├── values.yaml                  # kube-prometheus-stack configuration
-│       │   ├── tempo-values.yaml            # Grafana Tempo configuration
-│       │   └── otel-collector-values.yaml   # OTeL Collector configuration
+│       │   ├── values.yaml         # kube-prometheus-stack overrides
+│       │   ├── tempo-values.yaml
+│       │   └── otel-collector-values.yaml
 │       └── logging/
 │           ├── opensearch-values.yaml
 │           ├── opensearch-dashboards-values.yaml
 │           ├── opensearch-dashboards-ingress.yaml
-│           ├── opensearch-setup-job.yaml    # Creates ISM retention policy (runs once)
+│           ├── opensearch-setup-job.yaml   # Creates ISM policy + index template
 │           └── fluent-bit-values.yaml
-│
-├── services/
-│   └── demo-service/              # Source code lives here, CI/CD builds it
-│       ├── app/
-│       │   ├── main.py            # FastAPI endpoints
-│       │   ├── telemetry.py       # OpenTelemetry setup
-│       │   └── logging_config.py  # Structured JSON logging
-│       ├── Dockerfile
-│       └── requirements.txt
 │
 └── terraform/
     ├── environments/

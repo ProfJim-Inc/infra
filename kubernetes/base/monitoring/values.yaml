@@ -44,9 +44,21 @@ grafana:
     - grafana-opensearch-datasource
 
   # Pre-configured datasources: OpenSearch (logs) and Tempo (traces)
+  #
+  # IMPORTANT — explicit uid fields:
+  #   Grafana assigns a random internal UID to any datasource provisioned without an
+  #   explicit uid field.  The datasourceUid references inside Tempo's jsonData must
+  #   match the real UID — not the display name.  Setting uid here pins the UID so the
+  #   cross-datasource links (trace → logs, service map → Prometheus) always resolve.
+  #
+  #   kube-prometheus-stack provisions the built-in Prometheus datasource with
+  #   uid: prometheus by default, which is why that reference is safe to hardcode.
   additionalDataSources:
     - name: OpenSearch
       type: grafana-opensearch-datasource
+      # Pinned UID — referenced below in Tempo's tracesToLogsV2.datasourceUid.
+      # Without this, Grafana generates a random UID and the trace→log link silently breaks.
+      uid: opensearch
       access: proxy
       url: http://opensearch-cluster-master.logging.svc.cluster.local:9200
       jsonData:
@@ -60,15 +72,20 @@ grafana:
 
     - name: Tempo
       type: tempo
+      uid: tempo
       access: proxy
       url: http://tempo.monitoring.svc.cluster.local:3100
       jsonData:
         tracesToLogsV2:
-          datasourceUid: OpenSearch
+          # Must match uid: opensearch above.
+          # Grafana uses this to render the "Logs for this span" button in the trace view.
+          datasourceUid: opensearch
           tags:
             - key: "app"
             - key: "namespace"
         serviceMap:
+          # kube-prometheus-stack sets uid: prometheus on its built-in datasource,
+          # so this reference is stable across chart upgrades.
           datasourceUid: prometheus
       isDefault: false
 
