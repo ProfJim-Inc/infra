@@ -23,7 +23,7 @@ config:
     [SERVICE]
         Flush         5
         Daemon        Off
-        Log_Level     info
+        Log_Level     debug
         Parsers_File  parsers.conf
         HTTP_Server   On
         HTTP_Listen   0.0.0.0
@@ -76,6 +76,7 @@ config:
         Logstash_Prefix_Key _index
         Logstash_DateFormat %Y.%m.%d
         Suppress_Type_Name On
+        Trace_Error        On
         tls                Off
         tls.verify         Off
 
