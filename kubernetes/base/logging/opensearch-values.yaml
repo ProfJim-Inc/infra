@@ -15,6 +15,9 @@ config:
     cluster.name: creatium-logs
     network.host: 0.0.0.0
     plugins.security.disabled: true
+    # Raise indexing pressure limit from default 10% to 25% of JVM heap (~250MB).
+    # Default 10% (~100MB) causes 429s when Fluent Bit sends large bulk payloads.
+    indexing_pressure.memory.limit: 25%
 
 extraEnvs:
   - name: DISABLE_INSTALL_DEMO_CONFIG

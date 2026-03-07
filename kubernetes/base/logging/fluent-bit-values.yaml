@@ -21,9 +21,9 @@ daemonSetVolumeMounts:
 config:
   service: |
     [SERVICE]
-        Flush         5
+        Flush         15
         Daemon        Off
-        Log_Level     debug
+        Log_Level     info
         Parsers_File  parsers.conf
         HTTP_Server   On
         HTTP_Listen   0.0.0.0
@@ -35,7 +35,7 @@ config:
         Path              /var/log/containers/*.log
         multiline.parser  docker, cri
         Tag               kube.*
-        Mem_Buf_Limit     50MB
+        Mem_Buf_Limit     5MB
         Skip_Long_Lines   On
 
   filters: |
@@ -76,7 +76,6 @@ config:
         Logstash_Prefix_Key _index
         Logstash_DateFormat %Y.%m.%d
         Suppress_Type_Name On
-        Trace_Error        On
         tls                Off
         tls.verify         Off
 
