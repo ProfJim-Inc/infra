@@ -11,7 +11,7 @@ image:
 imagePullSecrets:
   - name: ghcr-pull-secret
 
-containerPort: 8000
+containerPort: 5324
 
 resources:
   requests:
