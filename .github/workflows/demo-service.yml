@@ -63,7 +63,7 @@ jobs:
       - name: Lint Helm chart with demo-service values
         uses: azure/setup-helm@v4
         with:
-          version: "3.16.x"
+          version: "3.17.1"
       - run: |
           helm lint kubernetes/charts/creatium-service/ \
             -f kubernetes/base/demo-service/values.yaml
