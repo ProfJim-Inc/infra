@@ -23,8 +23,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Dict
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from opentelemetry import trace
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
