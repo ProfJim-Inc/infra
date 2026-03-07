@@ -73,7 +73,7 @@ config:
         HTTP_User          admin
         HTTP_Passwd        admin
         Logstash_Format    On
-        Logstash_Prefix_Key _index
+        Logstash_Prefix_Key flb_index
         Logstash_DateFormat %Y.%m.%d
         Suppress_Type_Name On
         Trace_Error        On
@@ -96,7 +96,7 @@ luaScripts:
       end
       -- sanitize: lowercase, collapse non-alphanumeric runs to hyphens
       service = string.lower(tostring(service)):gsub("[^a-z0-9%-]+", "-")
-      record["_index"] = "logs-" .. service
+      record["flb_index"] = "logs-" .. service
       return 1, timestamp, record
     end
 
