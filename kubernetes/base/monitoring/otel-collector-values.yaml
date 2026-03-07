@@ -10,6 +10,10 @@ replicaCount: 1
 
 nameOverride: otel-collector
 
+# Required since chart 0.x dropped the default image — use contrib for prometheus exporter support
+image:
+  repository: otel/opentelemetry-collector-contrib
+
 nodeSelector:
   pool: system
 
