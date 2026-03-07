@@ -38,6 +38,16 @@ spec:
                 sleep 5
               done
 
+              # Raise indexing pressure limit from 10% (default) to 25%.
+              # Default 10% of 1GB heap = ~100MB; our Fluent Bit bulk payloads can
+              # exceed this causing 429 rejections. Applied via API (not opensearch.yml)
+              # to avoid static-setting format issues.
+              echo "==> Applying cluster settings..."
+              curl -sf -X PUT "$OPENSEARCH/_cluster/settings" \
+                -H 'Content-Type: application/json' \
+                -d '{"persistent": {"indexing_pressure.memory.limit": "25%"}}' \
+                && echo "" && echo "    Cluster settings applied."
+
               # ISM policy: delete indices older than 30 days.
               #
               # No rollover action is used here. Rollover requires a write alias
