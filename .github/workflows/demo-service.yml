@@ -52,6 +52,7 @@ jobs:
         with:
           context: services/demo-service
           push: false
+          platforms: linux/amd64
           tags: ${{ env.IMAGE }}:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -103,6 +104,7 @@ jobs:
         with:
           context: services/demo-service
           push: true
+          platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

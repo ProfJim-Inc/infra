@@ -70,6 +70,8 @@ config:
         Match              kube.*
         Host               opensearch-cluster-master.logging.svc.cluster.local
         Port               9200
+        HTTP_User          admin
+        HTTP_Passwd        admin
         Logstash_Format    On
         Logstash_Prefix_Key _index
         Logstash_DateFormat %Y.%m.%d

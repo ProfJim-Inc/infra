@@ -61,9 +61,8 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
   tls:
-    - secretName: demo-tls
-      hosts:
-        - demo.creatium.com
+    enabled: true
+    secretName: demo-tls
 
 # General pool — standard APIs and web services
 nodeSelector:

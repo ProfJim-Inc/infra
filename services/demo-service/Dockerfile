@@ -12,7 +12,7 @@ WORKDIR /build
 
 # Install deps first — layer is cached as long as requirements.txt is unchanged
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
 # --- Stage 2: runtime image ---
@@ -23,17 +23,16 @@ WORKDIR /app
 # Non-root user for security
 RUN groupadd -r app && useradd -r -g app --home /app app
 
-# Copy installed packages from deps stage
-COPY --from=deps /root/.local /home/app/.local
+# Copy installed packages into system Python path (no PATH tricks needed)
+COPY --from=deps /install /usr/local
 
 # Copy application source
 COPY app/ ./app/
 
-# Ensure pip-installed scripts (uvicorn) are on PATH
-ENV PATH=/home/app/.local/bin:$PATH \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+RUN chown -R app:app /app
 USER app
 
 EXPOSE 8000

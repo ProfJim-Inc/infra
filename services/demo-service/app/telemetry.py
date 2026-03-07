@@ -119,4 +119,4 @@ def setup_tracing() -> None:
     # It automatically records: http.method, http.url, http.status_code.
     # Any spans you create manually inside a handler become child spans of this auto-span.
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    FastAPIInstrumentor.instrument()
+    FastAPIInstrumentor().instrument()
