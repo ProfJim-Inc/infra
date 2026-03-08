@@ -535,9 +535,11 @@ NodeBalancer (Linode load balancer — created automatically when ingress-nginx 
    ▼
 ingress-nginx controller pod
    │
-   ├── grafana.creatium.com  ──►  kube-prometheus-stack-grafana:80
-   ├── logs.creatium.com     ──►  opensearch-dashboards:5601
-   └── demo.creatium.com     ──►  demo-service:80
+   ├── grafana.<IP>.nip.io       ──►  kube-prometheus-stack-grafana:80
+   ├── prometheus.<IP>.nip.io    ──►  prometheus-operated:9090
+   ├── alertmanager.<IP>.nip.io  ──►  alertmanager-operated:9093
+   ├── logs.<IP>.nip.io          ──►  opensearch-dashboards:5601
+   └── demo.creatium.com        ──►  demo-service:80
 ```
 
 Each service that wants public access sets `ingress.enabled: true` in its `values.yaml`
@@ -783,27 +785,43 @@ kubectl get pods -n production
 
 **Access the UIs:**
 
+All observability UIs are exposed via ingress-nginx using [nip.io](https://nip.io) wildcard DNS,
+so no custom DNS setup is needed. Get the NodeBalancer IP:
+
 ```bash
-# Grafana (metrics, traces, logs) — http://localhost:3000
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
-
-# OpenSearch Dashboards (log exploration) — http://localhost:5601
-kubectl port-forward -n logging svc/opensearch-dashboards 5601:5601
-
-# ArgoCD (GitOps status) — https://localhost:8080
-kubectl port-forward svc/argocd-server -n argocd 8080:443
+kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
-Once DNS is configured:
+Then access the UIs at:
 
 | Service | URL |
 |---------|-----|
-| Grafana | `https://grafana.creatium.com` |
-| OpenSearch Dashboards | `https://logs.creatium.com` |
-| Demo Service API | `https://demo.creatium.com` |
+| Grafana | `http://grafana.<NODEBALANCER_IP>.nip.io` |
+| Prometheus | `http://prometheus.<NODEBALANCER_IP>.nip.io` |
+| Alertmanager | `http://alertmanager.<NODEBALANCER_IP>.nip.io` |
+| OpenSearch Dashboards | `http://logs.<NODEBALANCER_IP>.nip.io` |
 
-> **DNS setup:** Get the NodeBalancer IP with `kubectl get svc -n ingress-nginx` and create
-> A records for `grafana.creatium.com`, `logs.creatium.com`, and `demo.creatium.com`.
+> **How nip.io works:** `<subdomain>.<IP>.nip.io` resolves to `<IP>`. The ingress controller
+> matches the `Host` header to route traffic to the correct backend service. No DNS records needed.
+
+Alternatively, use `kubectl port-forward` for local access without ingress:
+
+```bash
+# Grafana — http://localhost:3000
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+
+# Prometheus — http://localhost:9090
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+
+# Alertmanager — http://localhost:9093
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-alertmanager 9093:9093
+
+# OpenSearch Dashboards — http://localhost:5601
+kubectl port-forward -n logging svc/opensearch-dashboards 5601:5601
+
+# ArgoCD — https://localhost:8080
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
 
 ---
 
