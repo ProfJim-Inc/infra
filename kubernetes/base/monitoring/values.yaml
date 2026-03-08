@@ -25,11 +25,13 @@ grafana:
     enabled: true
     ingressClassName: nginx
     hosts:
-      - grafana.creatium.com
-    tls:
-      - secretName: grafana-tls
-        hosts:
-          - grafana.creatium.com
+      - grafana.172.236.105.207.nip.io
+    # TLS disabled — nip.io does not support certificates.
+    # Re-enable with proper DNS + cert-manager when switching to *.creatium.com.
+    # tls:
+    #   - secretName: grafana-tls
+    #     hosts:
+    #       - grafana.creatium.com
 
   resources:
     requests:
@@ -99,6 +101,12 @@ grafana:
 # Prometheus
 # =============================================================================
 prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - prometheus.172.236.105.207.nip.io
+
   prometheusSpec:
     nodeSelector:
       pool: system
@@ -135,6 +143,12 @@ prometheus:
 # Alertmanager
 # =============================================================================
 alertmanager:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - alertmanager.172.236.105.207.nip.io
+
   # Base global routing config.
   # Per-service routing is handled by AlertmanagerConfig CRs in their own namespaces.
   # This config provides the default null receiver and inhibition rules.

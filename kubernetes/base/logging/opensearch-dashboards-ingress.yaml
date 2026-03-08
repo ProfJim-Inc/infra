@@ -9,7 +9,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: logs.creatium.com
+    - host: logs.172.236.105.207.nip.io
       http:
         paths:
           - path: /
