@@ -72,8 +72,12 @@ serviceMonitor:
   path: /metrics
 
 config:
-  KOKORO_OPENSEARCH_LOGGING: "true"
-  KOKORO_OPENSEARCH_INDEX: "tts-logs"
+  SERVICE_NAME: "tts-microservice"
+  SERVICE_VERSION: "0.1.0"
+  ENV: "production"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  # OpenSearch — used by pronunciation cache (preprocess.py), NOT for logging
   OPENSEARCH_HOST: "opensearch-cluster-master.logging.svc.cluster.local"
   OPENSEARCH_PORT: "9200"
   OPENSEARCH_USE_SSL: "false"
