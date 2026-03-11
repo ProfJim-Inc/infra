@@ -1,0 +1,82 @@
+# =============================================================================
+# add-avatar-agent — Next.js management dashboard for voice API keys & config
+# =============================================================================
+nameOverride: add-avatar-agent
+
+image:
+  repository: ghcr.io/profjim-inc/add-avatar-agent
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 3000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /api/health
+    initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /api/health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: dashboard.creatium.com
+  path: /
+  tls:
+    enabled: true
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: frontend
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /api/metrics
+
+config:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  NEXTAUTH_URL: "https://dashboard.creatium.com"
+
+# Sensitive config — reference pre-created K8s Secrets
+# Create with:
+#   kubectl create secret generic add-avatar-agent-secrets \
+#     -n production \
+#     --from-literal=MONGODB_URI='mongodb+srv://...' \
+#     --from-literal=NEXTAUTH_SECRET='...' \
+#     --from-literal=AZURE_STORAGE_CONNECTION_STRING='...' \
+#     --from-literal=NEXT_PUBLIC_ELEVENLABS_API_KEY='...' \
+#     --from-literal=NEXT_PUBLIC_API_URL='https://api.creatium.com' \
+#     --from-literal=NEXT_PUBLIC_API_KEY='...'
+secretRefs:
+  - name: add-avatar-agent-secrets
