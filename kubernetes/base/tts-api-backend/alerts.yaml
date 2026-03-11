@@ -94,7 +94,7 @@ spec:
         - alert: TtsApiBackendHighFallbackRate
           expr: |
             (
-              rate(tts_provider_fallbacks_total{namespace="production"}[5m])
+              sum(rate(tts_provider_fallbacks_total{namespace="production"}[5m]))
               /
               sum(rate(tts_requests_total{namespace="production"}[5m]))
             ) > 0.10
@@ -111,7 +111,7 @@ spec:
         - alert: TtsApiBackendHighTTFBP95
           expr: |
             histogram_quantile(0.95,
-              rate(tts_ttfb_seconds_bucket{namespace="production"}[5m])
+              sum(rate(tts_ttfb_seconds_bucket{namespace="production"}[5m])) by (le)
             ) > 3.0
           for: 5m
           labels:

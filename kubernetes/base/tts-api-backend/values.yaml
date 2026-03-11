@@ -5,7 +5,7 @@ nameOverride: tts-api-backend
 
 image:
   repository: ghcr.io/profjim-inc/tts-api-backend
-  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+  tag: "0.1.0"   # managed by ArgoCD Image Updater (semver)
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -60,6 +60,9 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
     nginx.ingress.kubernetes.io/websocket-services: tts-api-backend
     nginx.ingress.kubernetes.io/enable-websocket: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
   tls:
     enabled: true
     secretName: tts-api-backend-tls
