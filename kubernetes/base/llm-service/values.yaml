@@ -84,20 +84,54 @@ config:
   LOG_FORMAT: "json"
   OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
 
+# All environment-specific values (endpoints, credentials, keys) are injected
+# via the llm-service-secrets SealedSecret — see sealed-secret.yaml
 secretRefs:
   - name: llm-service-secrets
     key: OPENAI_API_KEY
   - name: llm-service-secrets
+    key: OPENAI_BASE_URL
+  - name: llm-service-secrets
     key: MONGODB_URI
+  - name: llm-service-secrets
+    key: MONGODB_DB
   - name: llm-service-secrets
     key: PINECONE_API_KEY
   - name: llm-service-secrets
+    key: PINECONE_INDEX_NAME
+  - name: llm-service-secrets
+    key: PINECONE_INDEX_HOST
+  - name: llm-service-secrets
+    key: PINECONE_KB_ID
+  - name: llm-service-secrets
+    key: OPENSEARCH_HOST
+  - name: llm-service-secrets
+    key: OPENSEARCH_USER
+  - name: llm-service-secrets
     key: OPENSEARCH_PASSWORD
+  - name: llm-service-secrets
+    key: OPENSEARCH_USE_SSL
+  - name: llm-service-secrets
+    key: OPENSEARCH_VERIFY_CERTS
+  - name: llm-service-secrets
+    key: OPENSEARCH_SSL_SHOW_WARN
+  - name: llm-service-secrets
+    key: LINCOLN_ORG_ID
+  - name: llm-service-secrets
+    key: LINC_COACH_AGENT_ID
+  - name: llm-service-secrets
+    key: LINC_READIT_NAMESPACE
+  - name: llm-service-secrets
+    key: LINC_LESSON_NAMESPACE
   - name: llm-service-secrets
     key: LINC_AWS_ACCESS_KEY_ID
   - name: llm-service-secrets
     key: LINC_AWS_SECRET_ACCESS_KEY
-  # - name: llm-service-secrets
-  #   key: CONFIG_URL
-  # - name: llm-service-secrets
-  #   key: KEYS_URL
+  - name: llm-service-secrets
+    key: LINC_AWS_REGION
+  - name: llm-service-secrets
+    key: LINC_S3_BUCKET
+  - name: llm-service-secrets
+    key: KEYS_URL
+  - name: llm-service-secrets
+    key: CONFIG_URL
