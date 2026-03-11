@@ -26,6 +26,8 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: keda
       server: https://kubernetes.default.svc
+    - namespace: cert-manager
+      server: https://kubernetes.default.svc
 
   # Only allow deploying from our infra repo and approved Helm charts
   sourceRepos:
@@ -39,6 +41,7 @@ spec:
     - "https://nvidia.github.io/k8s-device-plugin"
     - "https://grafana.github.io/helm-charts"
     - "https://open-telemetry.github.io/opentelemetry-helm-charts"
+    - "https://charts.jetstack.io"
 
   # Allow these Kubernetes resource types
   clusterResourceWhitelist:
@@ -60,6 +63,8 @@ spec:
       kind: ClusterTriggerAuthentication
     - group: apiregistration.k8s.io
       kind: APIService
+    - group: cert-manager.io
+      kind: ClusterIssuer
 
   namespaceResourceWhitelist:
     - group: ""
@@ -81,4 +86,8 @@ spec:
     - group: bitnami.com
       kind: "*"
     - group: keda.sh
+      kind: "*"
+    - group: cert-manager.io
+      kind: "*"
+    - group: acme.cert-manager.io
       kind: "*"
