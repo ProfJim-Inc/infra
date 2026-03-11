@@ -37,7 +37,7 @@ spec:
       targetRevision: main
       path: kubernetes/base/equiphon
       directory:
-        include: "{alerts,alertmanager-config}.yaml"
+        include: "{alerts,alertmanager-config,grafana-dashboard}.yaml"
 
   destination:
     server: https://kubernetes.default.svc
