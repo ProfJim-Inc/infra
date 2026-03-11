@@ -35,7 +35,7 @@ spec:
       targetRevision: main
       path: kubernetes/base/tts-management-dashboard
       directory:
-        include: "{alerts,alertmanager-config}.yaml"
+        include: "{alerts,alertmanager-config,sealed-secret}.yaml"
 
   destination:
     server: https://kubernetes.default.svc

@@ -5,7 +5,7 @@ nameOverride: tts-management-dashboard
 
 image:
   repository: ghcr.io/profjim-inc/tts-management-dashboard
-  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+  tag: "0.1.0"   # managed by ArgoCD Image Updater (semver)
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -46,6 +46,8 @@ autoscaling:
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   host: dashboard.creatium.com
   path: /
   tls:
