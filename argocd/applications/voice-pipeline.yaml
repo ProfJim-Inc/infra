@@ -5,16 +5,10 @@ metadata:
   namespace: argocd
   labels:
     team: backend
-    tier: customer-facing
+    tier: internal
   annotations:
     argocd.argoproj.io/sync-wave: "2"
-    # ArgoCD Image Updater — automatically updates the image tag when a new
-    # semver image is pushed to GHCR.
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/voice-pipeline
-    argocd-image-updater.argoproj.io/app.update-strategy: semver
-    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/write-back-method: git
+    # Image tag is updated by CI workflow in the voice-pipeline repo
 spec:
   project: creatium
 

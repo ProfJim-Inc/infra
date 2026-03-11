@@ -8,7 +8,7 @@
 nameOverride: voice-pipeline-bridge
 
 image:
-  repository: ghcr.io/profjim-inc/voice-pipeline
+  repository: ghcr.io/profjim-inc/creatium-voice-pipeline
   tag: "latest"   # overridden by CI/CD with Git SHA on every merge
   pullPolicy: Always
 

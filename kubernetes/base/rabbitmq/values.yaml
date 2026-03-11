@@ -6,9 +6,13 @@
 # =============================================================================
 
 # -- Authentication
-# The Bitnami chart creates its own secret with the password.
-# We also create a separate rabbitmq-app-credentials secret (see checklist)
-# with keys RABBITMQ_USERNAME and RABBITMQ_PASSWORD for app consumption.
+# The Bitnami chart creates the RabbitMQ user using the password from the
+# rabbitmq-credentials K8s Secret (created manually, gitignored templates
+# live in kubernetes/secrets/). A separate rabbitmq-app-credentials secret
+# exposes the same password as RABBITMQ_USERNAME/RABBITMQ_PASSWORD env vars
+# for app consumption. Both secrets must use the same password.
+# See kubernetes/secrets/rabbitmq-credentials.yaml and
+#     kubernetes/secrets/rabbitmq-app-credentials.yaml for templates.
 auth:
   username: creatium
   existingPasswordSecret: rabbitmq-credentials
@@ -52,7 +56,10 @@ metrics:
       prometheus: kube-prometheus
       role: alert-rules
 
-# -- Single replica for now (can scale to 3 for HA later)
+# -- Single replica is acceptable for current SLA requirements.
+# RabbitMQ data survives pod restarts via persistent storage (10Gi PVC).
+# For HA, scale to 3 replicas with quorum queues and add a PodDisruptionBudget.
+# Revisit when message throughput or uptime SLA increases.
 replicaCount: 1
 
 # -- Priority queue support + least-privilege permissions

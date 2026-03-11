@@ -1,3 +1,7 @@
+# NOTE: AlertmanagerConfig is intentionally duplicated per service (rabbitmq,
+# voice-pipeline, voice-pipeline-bridge) rather than shared via a template.
+# Each service may diverge in routing rules, channels, or severity mappings.
+# If more services are onboarded, consider a Kustomize overlay or Helm template.
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:

@@ -4,7 +4,7 @@
 nameOverride: voice-pipeline
 
 image:
-  repository: ghcr.io/profjim-inc/voice-pipeline
+  repository: ghcr.io/profjim-inc/creatium-voice-pipeline
   tag: "latest"   # overridden by CI/CD with Git SHA on every merge
   pullPolicy: Always
 
@@ -77,12 +77,18 @@ affinity:
 
 commonLabels:
   team: backend
-  tier: customer-facing
+  tier: internal
   cost-center: engineering
 
 serviceMonitor:
   enabled: true
   path: /metrics
+
+# Grafana dashboard: grafana-dashboard.json in this directory.
+# Import via Grafana UI (Dashboards → Import → paste JSON) or wrap in a
+# ConfigMap with the grafana_dashboard=1 label for auto-provisioning.
+# The dashboard uses ${DS_PROMETHEUS} datasource variable — update the UID
+# to match your Grafana Prometheus datasource after import.
 
 config:
   ENV: "production"
@@ -96,14 +102,17 @@ config:
   BATCH_SIZE: "10"
   TIMEOUT_SECONDS: "300"
   AZURE_QUEUE_NAME: "creatium-narrateaudio"
+  AZURE_BLOB_CONTAINER: "REPLACE_ME"
+  VOICE_INFO_FILE_URL: "REPLACE_ME"
+  VOICE_INFO_FILE_URL_QA: "REPLACE_ME"
+  SPEECH_MODIFIER_URL: "REPLACE_ME"
+  ERROR_LOG_URL_PREFIX: "REPLACE_ME"
 
 # Secrets must be pre-created as K8s Secrets:
 #   kubectl create secret generic voice-pipeline-secrets -n production \
 #     --from-literal=ELEVENLABS_API_KEY=<key> \
 #     --from-literal=AZURE_CONNECTION_STRING=<conn-string> \
-#     --from-literal=AZURE_QUEUE_CONNECTION_STRING=<conn-string> \
-#     --from-literal=AWS_ACCESS_KEY=<key> \
-#     --from-literal=AWS_SECRET_KEY=<key>
+#     --from-literal=AZURE_QUEUE_CONNECTION_STRING=<conn-string>
 #   kubectl create secret generic rabbitmq-app-credentials -n production \
 #     --from-literal=RABBITMQ_USERNAME=creatium \
 #     --from-literal=RABBITMQ_PASSWORD=<password>
@@ -114,10 +123,6 @@ secretRefs:
     key: AZURE_CONNECTION_STRING
   - name: voice-pipeline-secrets
     key: AZURE_QUEUE_CONNECTION_STRING
-  - name: voice-pipeline-secrets
-    key: AWS_ACCESS_KEY
-  - name: voice-pipeline-secrets
-    key: AWS_SECRET_KEY
   - name: rabbitmq-app-credentials
     key: RABBITMQ_USERNAME
   - name: rabbitmq-app-credentials

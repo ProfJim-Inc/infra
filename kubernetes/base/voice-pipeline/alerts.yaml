@@ -152,10 +152,10 @@ spec:
 
         - alert: VoicePipelineNoJobsProcessed
           expr: |
-            rate(voice_pipeline_jobs_received_total[30m]) == 0
+            rate(voice_pipeline_jobs_received_total[2h]) == 0
               and
             voice_pipeline_rabbitmq_connected == 1
-          for: 30m
+          for: 2h
           labels:
             severity: warning
             service: voice-pipeline
@@ -163,4 +163,4 @@ spec:
           annotations:
             summary: "voice-pipeline not processing any jobs"
             description: >-
-              No jobs have been processed in the last 30 minutes despite active RabbitMQ connection.
+              No jobs have been processed in the last 2 hours despite active RabbitMQ connection.

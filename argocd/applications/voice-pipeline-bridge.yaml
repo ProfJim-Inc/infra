@@ -8,12 +8,8 @@ metadata:
     tier: internal
   annotations:
     argocd.argoproj.io/sync-wave: "1"
-    # Shares the same image as voice-pipeline — Image Updater keeps them in sync
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/voice-pipeline
-    argocd-image-updater.argoproj.io/app.update-strategy: semver
-    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/write-back-method: git
+    # Image tag is updated by CI workflow (same commit as voice-pipeline)
+    # No Image Updater here — avoids race conditions with two writers
 spec:
   project: creatium
 
