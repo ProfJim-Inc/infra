@@ -1,0 +1,64 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: llm-service
+  namespace: production
+  labels:
+    app.kubernetes.io/name: llm-service
+spec:
+  route:
+    receiver: slack-warnings
+    groupBy:
+      - alertname
+      - service
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    matchers:
+      - name: service
+        value: llm-service
+    routes:
+      - receiver: slack-critical
+        matchers:
+          - name: severity
+            value: critical
+        groupWait: 0s
+        repeatInterval: 1h
+        continue: true
+
+  receivers:
+    - name: slack-warnings
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: webhook_url
+          channel: "#alerts"
+          sendResolved: true
+          iconEmoji: ":warning:"
+          title: |
+            [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *Summary:* {{ .Annotations.summary }}
+            *Description:* {{ .Annotations.description }}
+            *Severity:* `{{ .Labels.severity }}`  |  *Service:* `{{ .Labels.service }}`
+            {{ if .Annotations.runbook }}*Runbook:* {{ .Annotations.runbook }}{{ end }}
+            {{ end }}
+
+    - name: slack-critical
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: webhook_url
+          channel: "#alerts-critical"
+          sendResolved: true
+          iconEmoji: ":rotating_light:"
+          title: |
+            :rotating_light: [CRITICAL{{ if eq .Status "resolved" }} — RESOLVED{{ end }}] {{ .GroupLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *Summary:* {{ .Annotations.summary }}
+            *Description:* {{ .Annotations.description }}
+            *Service:* `{{ .Labels.service }}`  |  *Namespace:* `{{ .Labels.namespace }}`
+            {{ if .Annotations.runbook }}*Immediate action:* `{{ .Annotations.runbook }}`{{ end }}
+            {{ end }}
