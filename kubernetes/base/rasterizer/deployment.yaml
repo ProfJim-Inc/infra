@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rasterizer
+  labels:
+    app: rasterizer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rasterizer
+  template:
+    metadata:
+      labels:
+        app: rasterizer
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-key
+      terminationGracePeriodSeconds: 60
+      nodeSelector:
+        pool: compute
+      tolerations:
+        - key: workload-type
+          value: compute
+          effect: NoSchedule
+      containers:
+        - name: rasterizer
+          image: alinnnn/rasterizer-creatium:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          envFrom:
+            - secretRef:
+                name: rasterizer-secrets
+          livenessProbe:
+            httpGet:
+              path: /openapi.json
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /openapi.json
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 10

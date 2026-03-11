@@ -1,0 +1,28 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: rasterizer-scaler
+spec:
+  scaleTargetRef:
+    name: rasterizer
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: rasterizer
+        mode: QueueLength
+        value: "2"
+      authenticationRef:
+        name: keda-rabbitmq-auth
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-rabbitmq-auth
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: rasterizer-secrets
+      key: RABBIT_URL

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rasterizer
+  labels:
+    app: rasterizer
+spec:
+  selector:
+    app: rasterizer
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
