@@ -46,15 +46,14 @@ autoscaling:
 ingress:
   enabled: true
   className: nginx
-  host: llm.creatium.com
+  host: llm.172.236.105.207.nip.io
   path: /
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
   tls:
-    enabled: true
-    secretName: llm-service-tls
+    enabled: false
 
 nodeSelector:
   pool: general
