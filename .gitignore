@@ -12,6 +12,7 @@ crash.log
 *.pem
 *.key
 credentials.json
+kubernetes/secrets/
 
 # OS
 .DS_Store

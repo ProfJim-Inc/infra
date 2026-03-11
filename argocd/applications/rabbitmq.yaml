@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rabbitmq
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: creatium
+
+  sources:
+    # Bitnami RabbitMQ Helm chart
+    - repoURL: https://charts.bitnami.com/bitnami
+      chart: rabbitmq
+      targetRevision: 15.x
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/rabbitmq/values.yaml
+
+    # Values from infra repo
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/rabbitmq
+      directory:
+        include: "{alerts,alertmanager-config}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

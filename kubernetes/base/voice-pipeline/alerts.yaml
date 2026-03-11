@@ -1,0 +1,166 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: voice-pipeline
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: voice-pipeline
+spec:
+  groups:
+    - name: voice-pipeline.availability
+      interval: 30s
+      rules:
+        - alert: VoicePipelineDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"voice-pipeline.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline has no running pods"
+            description: >-
+              All voice-pipeline replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/voice-pipeline -n production"
+
+        - alert: VoicePipelinePodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"voice-pipeline-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: voice-pipeline.slos
+      interval: 30s
+      rules:
+        - alert: VoicePipelineHighJobFailureRate
+          expr: |
+            (
+              sum(rate(voice_pipeline_jobs_failed_total[5m]))
+              /
+              sum(rate(voice_pipeline_jobs_received_total[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline job failure rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of TTS jobs are failing over the last 5 minutes.
+
+        - alert: VoicePipelineHighJobLatencyP95
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(
+                rate(voice_pipeline_job_duration_seconds_bucket[5m])
+              ) by (le, provider)
+            ) > 30.0
+          for: 5m
+          labels:
+            severity: warning
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline P95 job duration above 30 seconds"
+            description: >-
+              95th percentile job duration for provider {{ $labels.provider }} is {{ $value | humanizeDuration }}.
+
+    - name: voice-pipeline.business
+      interval: 60s
+      rules:
+        - alert: VoicePipelineHighTTSLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(
+                rate(voice_pipeline_tts_duration_seconds_bucket[5m])
+              ) by (le, provider)
+            ) > 10.0
+          for: 5m
+          labels:
+            severity: warning
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline TTS API P95 above 10 seconds"
+            description: >-
+              TTS provider {{ $labels.provider }} P95 latency is {{ $value | humanizeDuration }}.
+
+        - alert: VoicePipelineWebhookFailures
+          expr: |
+            rate(voice_pipeline_webhook_failed_total[10m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline webhook deliveries failing"
+            description: >-
+              Webhook delivery failures are occurring at {{ $value | printf "%.2f" }}/sec.
+
+        - alert: VoicePipelineDeadLetterSpike
+          expr: |
+            increase(voice_pipeline_messages_dead_lettered_total[15m]) > 5
+          for: 0m
+          labels:
+            severity: critical
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline messages being dead-lettered"
+            description: >-
+              {{ $value | printf "%.0f" }} messages have been dead-lettered in the last 15 minutes.
+            runbook: "Check RabbitMQ error queue and application logs for root cause."
+
+        - alert: VoicePipelineRabbitMQDisconnected
+          expr: |
+            voice_pipeline_rabbitmq_connected == 0
+          for: 2m
+          labels:
+            severity: critical
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline lost RabbitMQ connection"
+            description: >-
+              The voice-pipeline worker has been disconnected from RabbitMQ for over 2 minutes.
+            runbook: "kubectl logs deployment/voice-pipeline -n production | grep rabbitmq"
+
+        - alert: VoicePipelineNoJobsProcessed
+          expr: |
+            rate(voice_pipeline_jobs_received_total[30m]) == 0
+              and
+            voice_pipeline_rabbitmq_connected == 1
+          for: 30m
+          labels:
+            severity: warning
+            service: voice-pipeline
+            namespace: production
+          annotations:
+            summary: "voice-pipeline not processing any jobs"
+            description: >-
+              No jobs have been processed in the last 30 minutes despite active RabbitMQ connection.

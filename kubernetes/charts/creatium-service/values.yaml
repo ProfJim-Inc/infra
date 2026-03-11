@@ -23,6 +23,11 @@ image:
 imagePullSecrets: []
   # - name: ghcr-pull-secret
 
+# -- Override the container command (default: use Dockerfile CMD)
+command: []
+# -- Override the container args (default: use Dockerfile CMD args)
+args: []
+
 # -- Container port the application listens on
 containerPort: 3000
 

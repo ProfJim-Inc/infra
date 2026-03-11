@@ -1,0 +1,63 @@
+# =============================================================================
+# RabbitMQ — Shared message broker for all Creatium services
+# =============================================================================
+# Bitnami RabbitMQ Helm chart
+# Docs: https://github.com/bitnami/charts/tree/main/bitnami/rabbitmq
+# =============================================================================
+
+# -- Authentication
+# The Bitnami chart creates its own secret with the password.
+# We also create a separate rabbitmq-app-credentials secret (see checklist)
+# with keys RABBITMQ_USERNAME and RABBITMQ_PASSWORD for app consumption.
+auth:
+  username: creatium
+  existingPasswordSecret: rabbitmq-credentials
+  existingErlangCookieSecret: rabbitmq-credentials
+
+# -- Persistence (survive pod restarts)
+persistence:
+  enabled: true
+  storageClass: linode-block-storage
+  size: 10Gi
+
+# -- Resources (single-node, general pool)
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# -- Node placement
+nodeSelector:
+  pool: general
+
+# -- Plugins
+communityPlugins: ""
+extraPlugins: "rabbitmq_management rabbitmq_prometheus"
+
+# -- Management UI (internal only, no ingress)
+service:
+  type: ClusterIP
+
+# -- Prometheus metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: production
+    interval: 30s
+    labels:
+      prometheus: kube-prometheus
+      role: alert-rules
+
+# -- Single replica for now (can scale to 3 for HA later)
+replicaCount: 1
+
+# -- Priority queue support + least-privilege permissions
+extraConfiguration: |-
+  default_vhost = /
+  default_permissions.configure =
+  default_permissions.read = .*
+  default_permissions.write = .*

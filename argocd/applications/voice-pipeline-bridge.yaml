@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: voice-pipeline-bridge
+  namespace: argocd
+  labels:
+    team: backend
+    tier: internal
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    # Shares the same image as voice-pipeline — Image Updater keeps them in sync
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/voice-pipeline
+    argocd-image-updater.argoproj.io/app.update-strategy: semver
+    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/write-back-method: git
+spec:
+  project: creatium
+
+  sources:
+    # Source 1: The shared Helm chart
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/voice-pipeline-bridge/values.yaml
+
+    # Source 2: The per-service values file
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    # Source 3: Raw manifests (PrometheusRule alerts)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/voice-pipeline-bridge
+      directory:
+        include: "{alerts,alertmanager-config}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
