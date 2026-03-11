@@ -7,7 +7,7 @@ metadata:
     team: frontend
     tier: internal
   annotations:
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/tts-management-dashboard
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/creatium-tts-api
     argocd-image-updater.argoproj.io/app.update-strategy: semver
     argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
     argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
