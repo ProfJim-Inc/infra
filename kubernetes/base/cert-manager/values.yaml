@@ -1,0 +1,42 @@
+# =============================================================================
+# cert-manager — Automatic TLS certificate provisioning via Let's Encrypt
+# =============================================================================
+
+# Install CRDs as part of the Helm release
+crds:
+  enabled: true
+
+nodeSelector:
+  pool: system
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Webhook for validating cert-manager resources
+webhook:
+  nodeSelector:
+    pool: system
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# CA injector for injecting CA bundles
+cainjector:
+  nodeSelector:
+    pool: system
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
