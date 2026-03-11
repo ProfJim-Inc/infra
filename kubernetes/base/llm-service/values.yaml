@@ -1,0 +1,136 @@
+# =============================================================================
+# llm-service — OpenAI-compatible LLM orchestration API
+# =============================================================================
+nameOverride: llm-service
+
+image:
+  repository: ghcr.io/profjim-inc/llm-service
+  tag: "1d5084e"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: llm.172.236.105.207.nip.io
+  path: /
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  tls:
+    enabled: false
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: backend
+  tier: customer-facing
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 30
+
+config:
+  ENV: "production"
+  SERVICE_NAME: "llm-service"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+
+# All environment-specific values (endpoints, credentials, keys) are injected
+# via the llm-service-secrets SealedSecret — see sealed-secret.yaml
+secretRefs:
+  - name: llm-service-secrets
+    key: OPENAI_API_KEY
+  - name: llm-service-secrets
+    key: OPENAI_BASE_URL
+  - name: llm-service-secrets
+    key: MONGODB_URI
+  - name: llm-service-secrets
+    key: MONGODB_DB
+  - name: llm-service-secrets
+    key: PINECONE_API_KEY
+  - name: llm-service-secrets
+    key: PINECONE_INDEX_NAME
+  - name: llm-service-secrets
+    key: PINECONE_INDEX_HOST
+  - name: llm-service-secrets
+    key: PINECONE_KB_ID
+  - name: llm-service-secrets
+    key: OPENSEARCH_HOST
+  - name: llm-service-secrets
+    key: OPENSEARCH_USER
+  - name: llm-service-secrets
+    key: OPENSEARCH_PASSWORD
+  - name: llm-service-secrets
+    key: OPENSEARCH_USE_SSL
+  - name: llm-service-secrets
+    key: OPENSEARCH_VERIFY_CERTS
+  - name: llm-service-secrets
+    key: OPENSEARCH_SSL_SHOW_WARN
+  - name: llm-service-secrets
+    key: LINCOLN_ORG_ID
+  - name: llm-service-secrets
+    key: LINC_COACH_AGENT_ID
+  - name: llm-service-secrets
+    key: LINC_READIT_NAMESPACE
+  - name: llm-service-secrets
+    key: LINC_LESSON_NAMESPACE
+  - name: llm-service-secrets
+    key: LINC_AWS_ACCESS_KEY_ID
+  - name: llm-service-secrets
+    key: LINC_AWS_SECRET_ACCESS_KEY
+  - name: llm-service-secrets
+    key: LINC_AWS_REGION
+  - name: llm-service-secrets
+    key: LINC_S3_BUCKET
+  - name: llm-service-secrets
+    key: KEYS_URL
+  - name: llm-service-secrets
+    key: CONFIG_URL
