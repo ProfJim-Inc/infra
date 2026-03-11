@@ -14,7 +14,7 @@
 # See kubernetes/secrets/rabbitmq-credentials.yaml and
 #     kubernetes/secrets/rabbitmq-app-credentials.yaml for templates.
 auth:
-  username: creatium
+  username: creatium-prod-admin
   existingPasswordSecret: rabbitmq-credentials
   existingErlangCookieSecret: rabbitmq-credentials
 
