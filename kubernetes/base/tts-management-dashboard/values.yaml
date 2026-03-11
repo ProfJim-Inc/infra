@@ -1,10 +1,10 @@
 # =============================================================================
-# add-avatar-agent — Next.js management dashboard for voice API keys & config
+# tts-management-dashboard — Next.js management dashboard for voice API keys & config
 # =============================================================================
-nameOverride: add-avatar-agent
+nameOverride: tts-management-dashboard
 
 image:
-  repository: ghcr.io/profjim-inc/add-avatar-agent
+  repository: ghcr.io/profjim-inc/tts-management-dashboard
   tag: "latest"   # overridden by CI/CD with Git SHA on every merge
 
 imagePullSecrets:
@@ -70,7 +70,7 @@ config:
 
 # Sensitive config — reference pre-created K8s Secrets
 # Create with:
-#   kubectl create secret generic add-avatar-agent-secrets \
+#   kubectl create secret generic tts-management-dashboard-secrets \
 #     -n production \
 #     --from-literal=MONGODB_URI='mongodb+srv://...' \
 #     --from-literal=NEXTAUTH_SECRET='...' \
@@ -79,4 +79,4 @@ config:
 #     --from-literal=NEXT_PUBLIC_API_URL='https://api.creatium.com' \
 #     --from-literal=NEXT_PUBLIC_API_KEY='...'
 secretRefs:
-  - name: add-avatar-agent-secrets
+  - name: tts-management-dashboard-secrets

@@ -1,13 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: add-avatar-agent
+  name: tts-management-dashboard
   namespace: argocd
   labels:
     team: frontend
     tier: internal
   annotations:
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/add-avatar-agent
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/tts-management-dashboard
     argocd-image-updater.argoproj.io/app.update-strategy: semver
     argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
     argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
@@ -23,7 +23,7 @@ spec:
       path: kubernetes/charts/creatium-service
       helm:
         valueFiles:
-          - $values/kubernetes/base/add-avatar-agent/values.yaml
+          - $values/kubernetes/base/tts-management-dashboard/values.yaml
 
     # Source 2: The per-service values file (referenced as $values above)
     - repoURL: https://github.com/ProfJim-Inc/infra.git
@@ -33,7 +33,7 @@ spec:
     # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig)
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
-      path: kubernetes/base/add-avatar-agent
+      path: kubernetes/base/tts-management-dashboard
       directory:
         include: "{alerts,alertmanager-config}.yaml"
 

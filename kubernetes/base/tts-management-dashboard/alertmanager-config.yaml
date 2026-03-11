@@ -1,5 +1,5 @@
 # =============================================================================
-# AlertmanagerConfig — add-avatar-agent Slack routing
+# AlertmanagerConfig — tts-management-dashboard Slack routing
 #
 # Routing logic:
 #   severity=critical  → #alerts-critical (immediate, also notifies #alerts)
@@ -13,10 +13,10 @@
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
-  name: add-avatar-agent
+  name: tts-management-dashboard
   namespace: production
   labels:
-    app.kubernetes.io/name: add-avatar-agent
+    app.kubernetes.io/name: tts-management-dashboard
 spec:
   route:
     receiver: slack-warnings
@@ -28,7 +28,7 @@ spec:
     repeatInterval: 4h
     matchers:
       - name: service
-        value: add-avatar-agent
+        value: tts-management-dashboard
     routes:
       - receiver: slack-critical
         matchers:
