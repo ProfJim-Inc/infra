@@ -82,3 +82,24 @@ config:
 #     --from-literal=NEXT_PUBLIC_API_KEY='...'
 secretRefs:
   - name: tts-management-dashboard-secrets
+    key: MONGODB_URI
+  - name: tts-management-dashboard-secrets
+    key: MONGODB_CONNECTION_STRING
+  - name: tts-management-dashboard-secrets
+    key: NEXTAUTH_SECRET
+  - name: tts-management-dashboard-secrets
+    key: TTS_API_KEY
+  - name: tts-management-dashboard-secrets
+    key: TTS_WS_URL
+  - name: tts-management-dashboard-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: tts-management-dashboard-secrets
+    key: LITELLM_API_KEY
+  - name: tts-management-dashboard-secrets
+    key: LITELLM_API_URL
+  - name: tts-management-dashboard-secrets
+    key: LITELLM_MODEL
+  - name: tts-management-dashboard-secrets
+    key: SPECIAL_ORG_ID
+  - name: tts-management-dashboard-secrets
+    key: SUPERUSERS_JSON_LINK
