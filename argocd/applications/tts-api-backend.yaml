@@ -6,13 +6,6 @@ metadata:
   labels:
     team: platform
     tier: customer-facing
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/tts-api-backend
-    argocd-image-updater.argoproj.io/app.update-strategy: semver
-    argocd-image-updater.argoproj.io/app.pull-secret: pullsecret:production/ghcr-pull-secret
-    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/write-back-method: git
 spec:
   project: creatium
 
