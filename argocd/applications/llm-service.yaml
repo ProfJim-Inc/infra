@@ -6,7 +6,12 @@ metadata:
   labels:
     team: backend
     tier: customer-facing
-  # Image tags managed by CI GitOps step (commit SHA written directly to values.yaml)
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/llm-service
+    argocd-image-updater.argoproj.io/app.update-strategy: semver
+    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/write-back-method: git
 spec:
   project: creatium
 
