@@ -72,7 +72,7 @@ commonLabels:
 
 serviceMonitor:
   enabled: true
-  path: /metrics
+  path: /metrics/
 
 config:
   SERVICE_NAME: "tts-microservice"

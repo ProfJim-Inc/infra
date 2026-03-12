@@ -294,7 +294,8 @@ data:
           "targets": [{
             "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:tts-microservice*",
             "queryType": "lucene",
-            "timeField": "@timestamp"
+            "timeField": "@timestamp",
+            "metrics": [{ "type": "logs", "id": "1" }]
           }]
         }
       ]
