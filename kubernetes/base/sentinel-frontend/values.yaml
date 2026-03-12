@@ -1,0 +1,75 @@
+# =============================================================================
+# sentinel-frontend — Cloud cost tracking dashboard (React SPA on nginx)
+# =============================================================================
+nameOverride: sentinel-frontend
+
+image:
+  repository: ghcr.io/profjim-inc/sentinel-frontend
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /
+    initialDelaySeconds: 3
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: sentinel.creatium.com
+  path: /
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+  tls:
+    enabled: true
+    secretName: sentinel-frontend-tls
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: platform
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: false
+
+config:
+  VITE_API_BASE_URL: "https://sentinel-api.creatium.com/api/v1"

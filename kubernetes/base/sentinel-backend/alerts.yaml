@@ -1,0 +1,197 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sentinel-backend
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: sentinel-backend
+spec:
+  groups:
+    # ---- Availability alerts ----
+    - name: sentinel-backend.availability
+      interval: 30s
+      rules:
+        - alert: SentinelBackendDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"sentinel-backend.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend has no running pods"
+            description: >-
+              All sentinel-backend replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/sentinel-backend -n production"
+
+        - alert: SentinelBackendPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"sentinel-backend-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    # ---- Resource alerts ----
+    - name: sentinel-backend.resources
+      interval: 30s
+      rules:
+        - alert: SentinelBackendHighCPU
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{
+                namespace="production",
+                pod=~"sentinel-backend-.*"
+              }[5m])
+              /
+              kube_pod_container_resource_limits{
+                namespace="production",
+                pod=~"sentinel-backend-.*",
+                resource="cpu"
+              }
+            ) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend CPU usage above 85%"
+            description: >-
+              Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its CPU limit.
+
+        - alert: SentinelBackendHighMemory
+          expr: |
+            (
+              container_memory_working_set_bytes{
+                namespace="production",
+                pod=~"sentinel-backend-.*"
+              }
+              /
+              kube_pod_container_resource_limits{
+                namespace="production",
+                pod=~"sentinel-backend-.*",
+                resource="memory"
+              }
+            ) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend memory usage above 85%"
+            description: >-
+              Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit.
+
+        - alert: SentinelBackendOOMKilled
+          expr: |
+            increase(
+              kube_pod_container_status_last_terminated_reason{
+                namespace="production",
+                pod=~"sentinel-backend-.*",
+                reason="OOMKilled"
+              }[15m]
+            ) > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend pod was OOMKilled"
+            description: >-
+              Pod {{ $labels.pod }} was killed due to out-of-memory. Consider increasing memory limits.
+
+    # ---- SLO alerts ----
+    - name: sentinel-backend.slos
+      interval: 30s
+      rules:
+        - alert: SentinelBackendHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", exported_namespace="production", status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", exported_namespace="production"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx over the last 5 minutes.
+
+        - alert: SentinelBackendHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production"}[5m])
+              ) by (le, handler)
+            ) > 5.0
+          for: 5m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend P99 latency above 5 seconds"
+            description: >-
+              P99 latency for handler {{ $labels.handler }} is {{ $value | humanizeDuration }}.
+
+    # ---- Business alerts (will be populated with custom metrics in Phase 4) ----
+    - name: sentinel-backend.business
+      interval: 60s
+      rules:
+        - alert: SentinelCostRefreshStale
+          expr: |
+            (time() - sentinel_cost_refresh_last_success_timestamp) > 7200
+          for: 5m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend cost refresh has not completed in 2+ hours"
+            description: >-
+              The hourly cost refresh has not completed successfully in over 2 hours.
+              Providers may be showing stale data.
+
+        - alert: SentinelHighProviderErrorRate
+          expr: |
+            (
+              rate(sentinel_provider_fetch_errors_total[30m])
+              /
+              rate(sentinel_provider_fetch_total[30m])
+            ) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+            service: sentinel-backend
+            namespace: production
+          annotations:
+            summary: "sentinel-backend provider error rate above 50%"
+            description: >-
+              Provider {{ $labels.provider }} is failing {{ $value | humanizePercentage }} of fetch attempts.
