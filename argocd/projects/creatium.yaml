@@ -40,7 +40,6 @@ spec:
     - "https://kubernetes.github.io/ingress-nginx"
     - "https://bitnami-labs.github.io/sealed-secrets"
     - "https://kedacore.github.io/charts"
-    - "https://nvidia.github.io/k8s-device-plugin"
     - "https://nvidia.github.io/gpu-operator"
     - "https://grafana.github.io/helm-charts"
     - "https://open-telemetry.github.io/opentelemetry-helm-charts"

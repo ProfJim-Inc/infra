@@ -16,18 +16,32 @@ toolkit:
   enabled: true
 
 # -- Device Plugin: replaces the standalone nvidia-device-plugin helm chart
+# MPS sharing is configured via the ConfigMap referenced in devicePlugin.config.
 devicePlugin:
   enabled: true
+  config:
+    create: true
+    name: "mps-config"
+    default: "all"
 
-# -- MPS: enables Multi-Process Service for concurrent GPU sharing
+# -- MPS sharing ConfigMap
+# The "all" key applies to all GPUs. replicas controls how many pods can share
+# each GPU concurrently via MPS.
 mps:
-  default: "all"
+  config:
+    all: |-
+      version: v1
+      flags:
+        migStrategy: none
+      sharing:
+        mps:
+          resources:
+          - name: nvidia.com/gpu
+            replicas: 4
 
-# -- Target only GPU nodes
-nodeSelector:
-  pool: gpu
-
-tolerations:
-  - key: nvidia.com/gpu
-    operator: Exists
-    effect: NoSchedule
+# -- DaemonSet scheduling: tolerate GPU taint on all operator DaemonSets
+daemonsets:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
