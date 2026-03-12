@@ -5,7 +5,7 @@ nameOverride: llm-service
 
 image:
   repository: ghcr.io/profjim-inc/llm-service
-  tag: "v0.1.2"   # overridden by CI/CD with semver on every merge
+  tag: "v0.1.3"   # overridden by CI/CD with semver on every merge
 
 imagePullSecrets:
   - name: ghcr-pull-secret
