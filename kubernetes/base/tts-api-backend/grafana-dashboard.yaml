@@ -249,8 +249,10 @@ data:
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
           "datasource": { "uid": "opensearch" },
           "targets": [{
-            "query": "kubernetes.labels.app_kubernetes_io/name: tts-api-backend AND NOT level: DEBUG",
-            "metrics": [{ "type": "logs" }]
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:tts-api-backend*",
+            "queryType": "lucene",
+            "metrics": [{ "type": "logs", "id": "1" }],
+            "timeField": "@timestamp"
           }]
         }
 

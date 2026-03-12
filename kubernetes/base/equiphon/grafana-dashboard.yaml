@@ -203,6 +203,7 @@ data:
           "targets": [{
             "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:equiphon*",
             "queryType": "lucene",
+            "metrics": [{ "type": "logs", "id": "1" }],
             "timeField": "@timestamp"
           }]
         }
