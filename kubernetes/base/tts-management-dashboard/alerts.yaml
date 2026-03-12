@@ -1,0 +1,115 @@
+# =============================================================================
+# tts-management-dashboard PrometheusRules
+#
+# Four alert rules:
+#   TtsManagementDashboardDown            → critical → Slack #alerts-critical
+#   TtsManagementDashboardPodCrashLooping → warning  → Slack #alerts
+#   TtsManagementDashboardHighErrorRate   → warning  → Slack #alerts
+#   TtsManagementDashboardHighLatencyP99  → warning  → Slack #alerts
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tts-management-dashboard
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: tts-management-dashboard
+spec:
+  groups:
+    - name: tts-management-dashboard.availability
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # Alert 1: No running pods — most critical, immediate action needed
+        # -------------------------------------------------------------------
+        - alert: TtsManagementDashboardDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"tts-management-dashboard.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: tts-management-dashboard
+            namespace: production
+          annotations:
+            summary: "tts-management-dashboard has no running pods"
+            description: >-
+              All tts-management-dashboard replicas are unavailable for > 1 minute.
+              The management dashboard is inaccessible.
+            runbook: "kubectl rollout status deployment/tts-management-dashboard -n production"
+
+        # -------------------------------------------------------------------
+        # Alert 2: Pod crash-looping — surface restarts before full outage
+        # -------------------------------------------------------------------
+        - alert: TtsManagementDashboardPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"tts-management-dashboard-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: tts-management-dashboard
+            namespace: production
+          annotations:
+            summary: "tts-management-dashboard pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} (container: {{ $labels.container }}) has
+              restarted {{ $value | printf "%.0f" }} times in the last 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: tts-management-dashboard.slos
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # Alert 3: Error rate > 5% over 5 minutes
+        # -------------------------------------------------------------------
+        - alert: TtsManagementDashboardHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", service="tts-management-dashboard", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", service="tts-management-dashboard"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: tts-management-dashboard
+            namespace: production
+          annotations:
+            summary: "tts-management-dashboard HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx
+              over the last 5 minutes.
+
+        # -------------------------------------------------------------------
+        # Alert 4: P99 latency > 2s over 5 minutes
+        # -------------------------------------------------------------------
+        - alert: TtsManagementDashboardHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production", service="tts-management-dashboard"}[5m])
+              ) by (le)
+            ) > 2.0
+          for: 5m
+          labels:
+            severity: warning
+            service: tts-management-dashboard
+            namespace: production
+          annotations:
+            summary: "tts-management-dashboard P99 latency above 2 seconds"
+            description: >-
+              P99 latency is {{ $value | humanizeDuration }} over the last 5 minutes.

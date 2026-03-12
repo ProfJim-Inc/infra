@@ -1,0 +1,330 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-service-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  llm-service.json: |
+    {
+      "title": "LLM Service — Orchestration API",
+      "uid": "llm-service",
+      "tags": ["llm-service", "llm", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Request Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{pod=~\"llm-service-.*\"}[2m])) by (handler)",
+            "legendFormat": "{{ handler }}"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Error Rate (5xx)",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 },
+            "overrides": [{ "matcher": { "id": "byName", "options": "error rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{pod=~\"llm-service-.*\", status_code=~\"5..\"}[2m])) / sum(rate(http_requests_total{pod=~\"llm-service-.*\"}[2m]))",
+            "legendFormat": "error rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "HTTP Latency Percentiles",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{pod=~\"llm-service-.*\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{pod=~\"llm-service-.*\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{pod=~\"llm-service-.*\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Running Pods",
+          "gridPos": { "h": 6, "w": 3, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [
+            { "color": "red", "value": 0 },
+            { "color": "yellow", "value": 1 },
+            { "color": "green", "value": 2 }
+          ] } } },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"llm-service\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        {
+          "id": 5, "type": "stat", "title": "Active Requests",
+          "gridPos": { "h": 6, "w": 3, "x": 21, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [
+            { "color": "green", "value": 0 },
+            { "color": "yellow", "value": 50 },
+            { "color": "red", "value": 100 }
+          ] } } },
+          "targets": [{
+            "expr": "sum(llm_active_requests)",
+            "legendFormat": "in-flight"
+          }]
+        },
+
+        { "type": "row", "title": "LLM Completions", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Completion Rate by Model",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(llm_completions_total[2m])) by (model)",
+            "legendFormat": "{{ model }}"
+          }]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "Completion Duration (P50/P95/P99)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(llm_completion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(llm_completion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(llm_completion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 12, "type": "timeseries", "title": "Time to First Token (TTFT)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(llm_ttft_seconds_bucket[5m])) by (le, model))", "legendFormat": "p50 {{ model }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(llm_ttft_seconds_bucket[5m])) by (le, model))", "legendFormat": "p95 {{ model }}" }
+          ]
+        },
+
+        { "type": "row", "title": "Inference & Knowledge Base", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 20, "type": "timeseries", "title": "Inference Duration by Model/Stage",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(llm_inference_duration_seconds_bucket[5m])) by (le, model, stage))", "legendFormat": "p50 {{ model }}/{{ stage }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(llm_inference_duration_seconds_bucket[5m])) by (le, model, stage))", "legendFormat": "p95 {{ model }}/{{ stage }}" }
+          ]
+        },
+
+        {
+          "id": 21, "type": "timeseries", "title": "Pinecone Query Duration",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(llm_pinecone_query_duration_seconds_bucket[5m])) by (le, namespace))", "legendFormat": "p50 {{ namespace }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(llm_pinecone_query_duration_seconds_bucket[5m])) by (le, namespace))", "legendFormat": "p95 {{ namespace }}" }
+          ]
+        },
+
+        {
+          "id": 22, "type": "timeseries", "title": "Bedrock Retrieval & Embedding Duration",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(llm_bedrock_retrieve_duration_seconds_bucket[5m])) by (le))", "legendFormat": "bedrock p95" },
+            { "expr": "histogram_quantile(0.95, sum(rate(llm_embedding_duration_seconds_bucket[5m])) by (le))", "legendFormat": "embedding p95" }
+          ]
+        },
+
+        { "type": "row", "title": "Tools & Guardrails", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "collapsed": false },
+
+        {
+          "id": 30, "type": "timeseries", "title": "Tool Call Rate by Tool",
+          "gridPos": { "h": 7, "w": 6, "x": 0, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(llm_tool_calls_total[2m])) by (tool)",
+            "legendFormat": "{{ tool }}"
+          }]
+        },
+
+        {
+          "id": 31, "type": "timeseries", "title": "Tool Failure Rate",
+          "gridPos": { "h": 7, "w": 6, "x": 6, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0 },
+            "overrides": [{ "matcher": { "id": "byName", "options": "failure rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(llm_tool_calls_total{status!=\"success\"}[5m])) / sum(rate(llm_tool_calls_total[5m]))",
+            "legendFormat": "failure rate"
+          }]
+        },
+
+        {
+          "id": 32, "type": "timeseries", "title": "Tool Duration (P95) by Tool",
+          "gridPos": { "h": 7, "w": 6, "x": 12, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum(rate(llm_tool_duration_seconds_bucket[5m])) by (le, tool))",
+            "legendFormat": "p95 {{ tool }}"
+          }]
+        },
+
+        {
+          "id": 33, "type": "timeseries", "title": "Guardrails & Gate Actions",
+          "gridPos": { "h": 7, "w": 6, "x": 18, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [
+            { "expr": "sum(rate(llm_completions_blocked_total[2m])) by (reason)", "legendFormat": "blocked: {{ reason }}" },
+            { "expr": "sum(rate(llm_gate_actions_total[2m])) by (action)", "legendFormat": "gate: {{ action }}" },
+            { "expr": "rate(llm_rate_limit_exceeded_total[2m])", "legendFormat": "rate limited" }
+          ]
+        },
+
+        { "type": "row", "title": "Webhook Tools", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }, "collapsed": false },
+
+        {
+          "id": 35, "type": "timeseries", "title": "Webhook Tool Call Rate",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(llm_webhook_tool_calls_total[2m])) by (status)",
+            "legendFormat": "{{ status }}"
+          }]
+        },
+
+        {
+          "id": 36, "type": "stat", "title": "Exporter Queue Depths",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [
+            { "color": "green", "value": 0 },
+            { "color": "yellow", "value": 2000 },
+            { "color": "red", "value": 4000 }
+          ] } } },
+          "targets": [
+            { "expr": "llm_log_queue_depth", "legendFormat": "log queue" },
+            { "expr": "llm_metrics_queue_depth", "legendFormat": "metrics queue" }
+          ]
+        },
+
+        { "type": "row", "title": "Downstream Services", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 }, "collapsed": false },
+
+        {
+          "id": 60, "type": "timeseries", "title": "Downstream Error Rate by Service",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 15, "stacking": { "mode": "normal" } } } },
+          "targets": [{
+            "expr": "sum(rate(llm_downstream_errors_total[5m])) by (service)",
+            "legendFormat": "{{ service }}"
+          }]
+        },
+
+        {
+          "id": 61, "type": "timeseries", "title": "LLM Provider Errors by Status",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops",
+            "custom": { "fillOpacity": 15 } },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": ".*429.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+              { "matcher": { "id": "byRegexp", "options": ".*5.." }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+            ]
+          },
+          "targets": [{
+            "expr": "sum(rate(llm_provider_errors_total[5m])) by (model, status_code)",
+            "legendFormat": "{{ model }} ({{ status_code }})"
+          }]
+        },
+
+
+        {
+          "id": 65, "type": "timeseries", "title": "Component Pipeline Duration (P95)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum(rate(llm_component_duration_seconds_bucket[5m])) by (le, component))",
+            "legendFormat": "p95 {{ component }}"
+          }]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 }, "collapsed": false },
+
+        {
+          "id": 40, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 54 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"llm-service-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 41, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 54 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"llm-service-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 42, "type": "timeseries", "title": "HPA Replica Count",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 54 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            { "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"production\", horizontalpodautoscaler=\"llm-service\"}", "legendFormat": "current" },
+            { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"production\", horizontalpodautoscaler=\"llm-service\"}", "legendFormat": "desired" },
+            { "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"production\", horizontalpodautoscaler=\"llm-service\"}", "legendFormat": "max" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 }, "collapsed": false },
+
+        {
+          "id": 50, "type": "logs", "title": "llm-service Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 61 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:llm-service*",
+            "queryType": "lucene",
+            "timeField": "@timestamp"
+          }]
+        }
+      ]
+    }

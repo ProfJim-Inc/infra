@@ -1,20 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: equiphon
+  name: tts-api-backend
   namespace: argocd
   labels:
     team: platform
-    tier: internal
-  annotations:
-    # ArgoCD Image Updater — automatically updates the image tag when a new
-    # semver image is pushed to GHCR.
-    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/equiphon
-    argocd-image-updater.argoproj.io/app.update-strategy: semver
-    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
-    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
-    argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/app.pull-secret: pullsecret:production/ghcr-pull-secret
+    tier: customer-facing
 spec:
   project: creatium
 
@@ -25,19 +16,19 @@ spec:
       path: kubernetes/charts/creatium-service
       helm:
         valueFiles:
-          - $values/kubernetes/base/equiphon/values.yaml
+          - $values/kubernetes/base/tts-api-backend/values.yaml
 
     # Source 2: The per-service values file (referenced as $values above)
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
       ref: values
 
-    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig)
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig + Grafana Dashboard)
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
-      path: kubernetes/base/equiphon
+      path: kubernetes/base/tts-api-backend
       directory:
-        include: "{alerts,alertmanager-config,grafana-dashboard}.yaml"
+        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret}.yaml"
 
   destination:
     server: https://kubernetes.default.svc

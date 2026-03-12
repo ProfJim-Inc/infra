@@ -1,0 +1,105 @@
+# =============================================================================
+# tts-management-dashboard — Next.js management dashboard for voice API keys & config
+# =============================================================================
+nameOverride: tts-management-dashboard
+
+image:
+  repository: ghcr.io/profjim-inc/creatium-tts-api
+  tag: "0.1.0"   # managed by ArgoCD Image Updater (semver)
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 3000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /api/health
+    initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /api/health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: dashboard.creatium.com
+  path: /
+  tls:
+    enabled: true
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: frontend
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /api/metrics
+
+config:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  NEXTAUTH_URL: "https://dashboard.creatium.com"
+
+# Sensitive config — reference pre-created K8s Secrets
+# Create with:
+#   kubectl create secret generic tts-management-dashboard-secrets \
+#     -n production \
+#     --from-literal=MONGODB_URI='mongodb+srv://...' \
+#     --from-literal=NEXTAUTH_SECRET='...' \
+#     --from-literal=AZURE_STORAGE_CONNECTION_STRING='...' \
+#     --from-literal=NEXT_PUBLIC_ELEVENLABS_API_KEY='...' \
+#     --from-literal=NEXT_PUBLIC_API_URL='https://api.creatium.com' \
+#     --from-literal=NEXT_PUBLIC_API_KEY='...'
+secretRefs:
+  - name: tts-management-dashboard-secrets
+    key: MONGODB_URI
+  - name: tts-management-dashboard-secrets
+    key: MONGODB_CONNECTION_STRING
+  - name: tts-management-dashboard-secrets
+    key: NEXTAUTH_SECRET
+  - name: tts-management-dashboard-secrets
+    key: TTS_API_KEY
+  - name: tts-management-dashboard-secrets
+    key: TTS_WS_URL
+  - name: tts-management-dashboard-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: tts-management-dashboard-secrets
+    key: LITELLM_API_KEY
+  - name: tts-management-dashboard-secrets
+    key: LITELLM_API_URL
+  - name: tts-management-dashboard-secrets
+    key: LITELLM_MODEL
+  - name: tts-management-dashboard-secrets
+    key: SPECIAL_ORG_ID
+  - name: tts-management-dashboard-secrets
+    key: SUPERUSERS_JSON_LINK

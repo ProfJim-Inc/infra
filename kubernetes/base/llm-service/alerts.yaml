@@ -1,0 +1,212 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: llm-service
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: llm-service
+spec:
+  groups:
+    - name: llm-service.availability
+      interval: 30s
+      rules:
+        - alert: LlmServiceDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"llm-service.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service has no running pods"
+            description: >-
+              All llm-service replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/llm-service -n production"
+
+        - alert: LlmServicePodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"llm-service-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: llm-service.slos
+      interval: 30s
+      rules:
+        - alert: LlmServiceHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", service="llm-service", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", service="llm-service"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx over the last 5 minutes.
+
+        - alert: LlmServiceHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production", service="llm-service"}[5m])
+              ) by (le, handler)
+            ) > 5.0
+          for: 5m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service P99 latency above 5 seconds"
+            description: >-
+              P99 latency for handler {{ $labels.handler }} is {{ $value | humanizeDuration }}.
+
+    - name: llm-service.business
+      interval: 60s
+      rules:
+        - alert: LlmServiceHighGuardrailBlockRate
+          expr: |
+            (
+              sum(rate(llm_completions_blocked_total[5m]))
+              /
+              sum(rate(llm_completions_total[5m]))
+            ) > 0.15
+          for: 5m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service guardrail block rate above 15%"
+            description: >-
+              {{ $value | humanizePercentage }} of completion requests are being blocked by guardrails.
+
+        - alert: LlmServiceHighToolFailureRate
+          expr: |
+            (
+              sum(rate(llm_tool_calls_total{status!="success"}[5m]))
+              /
+              sum(rate(llm_tool_calls_total[5m]))
+            ) > 0.10
+          for: 3m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service tool failure rate above 10%"
+            description: >-
+              {{ $value | humanizePercentage }} of tool calls are failing.
+
+        - alert: LlmServiceSlowInference
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(llm_inference_duration_seconds_bucket[5m])) by (le, model)
+            ) > 30.0
+          for: 5m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service LLM inference P95 above 30 seconds"
+            description: >-
+              95th percentile inference time for model {{ $labels.model }} is {{ $value | humanizeDuration }}.
+
+        - alert: LlmServiceHighCompletionLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(llm_completion_duration_seconds_bucket[5m])) by (le)
+            ) > 60.0
+          for: 5m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service end-to-end completion P95 above 60 seconds"
+            description: >-
+              95th percentile end-to-end completion time is {{ $value | humanizeDuration }}.
+
+        - alert: LlmServiceExporterQueueBackpressure
+          expr: |
+            llm_log_queue_depth > 4000 or llm_metrics_queue_depth > 4000
+          for: 5m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service exporter queue nearing capacity"
+            description: >-
+              Exporter queue depth is {{ $value }} (capacity: 5000). Risk of dropped logs/metrics.
+
+    - name: llm-service.downstream
+      interval: 30s
+      rules:
+        - alert: LlmServiceHighDownstreamErrorRate
+          expr: |
+            sum(rate(llm_downstream_errors_total[5m])) by (service) > 0.5
+          for: 3m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service downstream {{ $labels.service }} error rate elevated"
+            description: >-
+              {{ $labels.service }} is returning {{ $value | printf "%.1f" }} errors/sec over the last 5 minutes.
+
+        - alert: LlmServiceLLMProviderErrors
+          expr: |
+            sum(rate(llm_provider_errors_total[5m])) > 0.2
+          for: 3m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service LLM provider errors elevated"
+            description: >-
+              LLM provider returning {{ $value | printf "%.2f" }} errors/sec. Check model {{ $labels.model }} status code {{ $labels.status_code }}.
+
+        - alert: LlmServiceLLMProviderHighRateLimiting
+          expr: |
+            sum(rate(llm_provider_errors_total{status_code="429"}[5m])) > 0.5
+          for: 2m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service hitting LLM provider rate limits"
+            description: >-
+              Receiving {{ $value | printf "%.1f" }} 429 responses/sec from the LLM provider.
+
