@@ -78,7 +78,7 @@ commonLabels:
 
 serviceMonitor:
   enabled: true
-  path: /metrics
+  path: /metrics/
 
 config:
   ENV: "production"
