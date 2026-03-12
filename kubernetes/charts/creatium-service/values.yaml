@@ -19,6 +19,12 @@ image:
   tag: "latest"
   pullPolicy: IfNotPresent
 
+# -- Override container command (default: use Dockerfile CMD)
+command: []
+
+# -- Override container args (default: use Dockerfile CMD args)
+args: []
+
 # -- Image pull secrets for private registries (e.g. ghcr.io)
 imagePullSecrets: []
   # - name: ghcr-pull-secret
