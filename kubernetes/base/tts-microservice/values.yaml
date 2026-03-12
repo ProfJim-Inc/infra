@@ -61,6 +61,9 @@ tolerations:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
+  - key: workload-type
+    value: gpu
+    effect: NoSchedule
 
 commonLabels:
   team: backend
