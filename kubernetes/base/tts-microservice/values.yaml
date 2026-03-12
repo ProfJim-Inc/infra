@@ -2,7 +2,7 @@
 nameOverride: tts-microservice
 
 image:
-  repository: ghcr.io/creatium/tts-microservice
+  repository: ghcr.io/profjim-inc/tts-microservice
   tag: "0.1.0"
 
 imagePullSecrets:

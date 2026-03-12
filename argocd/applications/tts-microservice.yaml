@@ -8,7 +8,7 @@ metadata:
     tier: customer-facing
   annotations:
     # ── ArgoCD Image Updater ────────────────────────────────────────────────
-    # Watches ghcr.io/creatium/tts-microservice for new semver tags (e.g. 1.2.3).
+    # Watches ghcr.io/profjim-inc/tts-microservice for new semver tags (e.g. 1.2.3).
     # When a newer tag is found, writes it back to the values file in git and
     # ArgoCD auto-syncs the new image — fully GitOps, no manual tag bumps.
     #
@@ -25,7 +25,7 @@ metadata:
     #          --docker-server=ghcr.io \
     #          --docker-username=<github-user> \
     #          --docker-password=<github-pat>
-    argocd-image-updater.argoproj.io/image-list: tts=ghcr.io/creatium/tts-microservice
+    argocd-image-updater.argoproj.io/image-list: tts=ghcr.io/profjim-inc/tts-microservice
     argocd-image-updater.argoproj.io/tts.update-strategy: semver
     argocd-image-updater.argoproj.io/tts.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
     argocd-image-updater.argoproj.io/tts.helm.image-name: image.repository
