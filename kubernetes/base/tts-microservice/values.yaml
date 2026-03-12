@@ -11,17 +11,14 @@ imagePullSecrets:
 # Port 9000 — hardcoded in Dockerfile.api and uvicorn entrypoint
 containerPort: 9000
 
-# Sized to match Cerebrium staging: 11 CPU / 92GB RAM / 1× NVIDIA L40.
-# Kokoro model (~327MB) + PyTorch + CUDA runtime + 32 voice files + inference
-# buffers need substantial system RAM even though the model itself runs on GPU VRAM.
 resources:
   requests:
-    cpu: 8000m
-    memory: 64Gi
+    cpu: 4000m
+    memory: 8Gi
     nvidia.com/gpu: "1"
   limits:
-    cpu: 11000m
-    memory: 92Gi
+    cpu: 12000m
+    memory: 24Gi
     nvidia.com/gpu: "1"
 
 probes:
