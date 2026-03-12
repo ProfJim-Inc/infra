@@ -32,7 +32,6 @@ metadata:
     argocd-image-updater.argoproj.io/tts.helm.image-tag: image.tag
     argocd-image-updater.argoproj.io/tts.pull-secret: pullsecret:argocd/ghcr-pull-secret
     argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/write-back-target: "helmvalues:kubernetes/base/tts-microservice/values.yaml"
     argocd-image-updater.argoproj.io/git-branch: main
 spec:
   project: creatium
