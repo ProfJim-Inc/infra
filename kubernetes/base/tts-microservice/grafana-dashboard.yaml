@@ -25,7 +25,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "reqps" } },
           "targets": [{
-            "expr": "sum(rate(tts_requests_total{namespace=\"production\"}[2m])) by (endpoint)",
+            "expr": "sum(rate(kokoro_requests_total{namespace=\"production\"}[2m])) by (endpoint)",
             "legendFormat": "{{ endpoint }}"
           }]
         },
@@ -39,7 +39,7 @@ data:
               "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
           },
           "targets": [{
-            "expr": "sum(rate(tts_errors_total{namespace=\"production\"}[5m])) / sum(rate(tts_requests_total{namespace=\"production\"}[5m]))",
+            "expr": "sum(rate(kokoro_errors_total{namespace=\"production\"}[5m])) / sum(rate(kokoro_requests_total{namespace=\"production\"}[5m]))",
             "legendFormat": "error rate"
           }]
         },
@@ -50,9 +50,9 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(tts_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
           ]
         },
 
@@ -70,7 +70,7 @@ data:
             }
           },
           "targets": [{
-            "expr": "tts_active_connections{namespace=\"production\"}",
+            "expr": "kokoro_active_connections{namespace=\"production\"}",
             "legendFormat": "connections"
           }]
         },
@@ -101,9 +101,9 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(tts_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
           ]
         },
 
@@ -113,9 +113,9 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(tts_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
           ]
         },
 
@@ -125,9 +125,9 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(tts_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
           ]
         },
 
@@ -137,9 +137,9 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(tts_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
           ]
         },
 
@@ -149,8 +149,8 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_preprocessing_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_preprocessing_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_preprocessing_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_preprocessing_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
           ]
         },
 
@@ -160,9 +160,9 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
-            { "expr": "histogram_quantile(0.99, sum(rate(tts_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
           ]
         },
 
@@ -174,8 +174,8 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short", "displayName": "chars/s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_chars_per_second_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_chars_per_second_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_chars_per_second_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_chars_per_second_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
           ]
         },
 
@@ -185,8 +185,8 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [
-            { "expr": "histogram_quantile(0.50, sum(rate(tts_audio_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
-            { "expr": "histogram_quantile(0.95, sum(rate(tts_audio_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_audio_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_audio_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
           ]
         },
 
@@ -196,7 +196,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "Bps" } },
           "targets": [{
-            "expr": "sum(rate(tts_bytes_total{namespace=\"production\"}[2m])) by (endpoint)",
+            "expr": "sum(rate(kokoro_bytes_total{namespace=\"production\"}[2m])) by (endpoint)",
             "legendFormat": "{{ endpoint }}"
           }]
         },
@@ -210,7 +210,7 @@ data:
               "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }]
           },
           "targets": [{
-            "expr": "sum(rate(tts_admission_rejections_total{namespace=\"production\"}[2m]))",
+            "expr": "sum(rate(kokoro_admission_rejections_total{namespace=\"production\"}[2m]))",
             "legendFormat": "rejections"
           }]
         },
@@ -222,7 +222,7 @@ data:
           "gridPos": { "h": 7, "w": 8, "x": 0, "y": 24 },
           "datasource": { "uid": "prometheus" },
           "targets": [{
-            "expr": "sum(increase(tts_requests_total{namespace=\"production\"}[1h])) by (voice)",
+            "expr": "sum(increase(kokoro_requests_total{namespace=\"production\"}[1h])) by (voice)",
             "legendFormat": "{{ voice }}"
           }]
         },
@@ -233,7 +233,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "reqps" } },
           "targets": [{
-            "expr": "sum(rate(tts_requests_total{namespace=\"production\"}[2m])) by (voice)",
+            "expr": "sum(rate(kokoro_requests_total{namespace=\"production\"}[2m])) by (voice)",
             "legendFormat": "{{ voice }}"
           }]
         },
@@ -244,7 +244,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "s" } },
           "targets": [{
-            "expr": "histogram_quantile(0.95, sum(rate(tts_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le, voice))",
+            "expr": "histogram_quantile(0.95, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le, voice))",
             "legendFormat": "{{ voice }}"
           }]
         },

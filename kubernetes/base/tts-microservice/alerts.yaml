@@ -104,9 +104,9 @@ spec:
         - alert: TtsMicroserviceHighErrorRate
           expr: |
             (
-              sum(rate(tts_errors_total{namespace="production"}[5m]))
+              sum(rate(kokoro_errors_total{namespace="production"}[5m]))
               /
-              sum(rate(tts_requests_total{namespace="production"}[5m]))
+              sum(rate(kokoro_requests_total{namespace="production"}[5m]))
             ) > 0.05
           for: 2m
           labels:
@@ -127,7 +127,7 @@ spec:
             histogram_quantile(
               0.99,
               sum(
-                rate(tts_request_duration_seconds_bucket{namespace="production"}[5m])
+                rate(kokoro_request_duration_seconds_bucket{namespace="production"}[5m])
               ) by (le, endpoint)
             ) > 10.0
           for: 5m
@@ -146,7 +146,7 @@ spec:
         # -------------------------------------------------------------------
         - alert: TtsMicroserviceAdmissionSpike
           expr: |
-            sum(rate(tts_admission_rejections_total{namespace="production"}[5m])) > 0.1
+            sum(rate(kokoro_admission_rejections_total{namespace="production"}[5m])) > 0.1
           for: 3m
           labels:
             severity: warning
