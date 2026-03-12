@@ -79,7 +79,7 @@ config:
   ENV: "production"
   SERVICE_NAME: "llm-service"
   SERVICE_VERSION: "0.1.0"
-  LOG_LEVEL: "INFO"
+  LOG_LEVEL: "DEBUG"
   LOG_FORMAT: "json"
   OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
 
