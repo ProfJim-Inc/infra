@@ -37,13 +37,26 @@ metadata:
 spec:
   project: creatium
 
-  source:
-    repoURL: https://github.com/ProfJim-Inc/infra.git
-    targetRevision: main
-    path: kubernetes/charts/creatium-service
-    helm:
-      valueFiles:
-        - ../../../kubernetes/base/tts-microservice/values.yaml
+  sources:
+    # Source 1: The shared Helm chart + per-service values
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/tts-microservice/values.yaml
+
+    # Source 2: Per-service values file (referenced as $values above)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig + Grafana dashboard)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/tts-microservice
+      directory:
+        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret}.yaml"
 
   destination:
     server: https://kubernetes.default.svc

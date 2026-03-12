@@ -1,0 +1,302 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tts-microservice-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  tts-microservice.json: |
+    {
+      "title": "TTS Microservice (Kokoro)",
+      "uid": "tts-microservice",
+      "tags": ["tts", "kokoro", "gpu", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Request Rate (by endpoint)",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(kokoro_requests_total{namespace=\"production\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Error Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "error rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(kokoro_errors_total{namespace=\"production\"}[5m])) / sum(rate(kokoro_requests_total{namespace=\"production\"}[5m]))",
+            "legendFormat": "error rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "Request Duration Percentiles",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_request_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Active WebSocket Connections",
+          "gridPos": { "h": 3, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 40 },
+                { "color": "red", "value": 50 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "kokoro_active_connections{namespace=\"production\"}",
+            "legendFormat": "connections"
+          }]
+        },
+
+        {
+          "id": 5, "type": "stat", "title": "Pod Status",
+          "gridPos": { "h": 3, "w": 6, "x": 18, "y": 4 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "green", "value": 1 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=~\"tts-microservice.*\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        { "type": "row", "title": "Pipeline Latency Breakdown", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Time to First Byte (TTFB)",
+          "gridPos": { "h": 7, "w": 4, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_time_to_first_byte_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 14, "type": "timeseries", "title": "First Chunk Time",
+          "gridPos": { "h": 7, "w": 4, "x": 4, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_first_chunk_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 15, "type": "timeseries", "title": "WS Handshake Time",
+          "gridPos": { "h": 7, "w": 4, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_handshake_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "GPU Inference Time",
+          "gridPos": { "h": 7, "w": 4, "x": 12, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 12, "type": "timeseries", "title": "Preprocessing Time",
+          "gridPos": { "h": 7, "w": 4, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_preprocessing_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_preprocessing_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 13, "type": "timeseries", "title": "Queue Wait Time",
+          "gridPos": { "h": 7, "w": 4, "x": 20, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(kokoro_queue_wait_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        { "type": "row", "title": "Throughput & Output", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 20, "type": "timeseries", "title": "Characters / Second (Throughput)",
+          "gridPos": { "h": 7, "w": 6, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "displayName": "chars/s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_chars_per_second_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_chars_per_second_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 21, "type": "timeseries", "title": "Audio Duration Generated",
+          "gridPos": { "h": 7, "w": 6, "x": 6, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(kokoro_audio_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(kokoro_audio_duration_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 22, "type": "timeseries", "title": "Bytes Streamed",
+          "gridPos": { "h": 7, "w": 6, "x": 12, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "Bps" } },
+          "targets": [{
+            "expr": "sum(rate(kokoro_bytes_total{namespace=\"production\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 23, "type": "timeseries", "title": "Admission Rejections (429s)",
+          "gridPos": { "h": 7, "w": 6, "x": 18, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "rejections" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(kokoro_admission_rejections_total{namespace=\"production\"}[2m]))",
+            "legendFormat": "rejections"
+          }]
+        },
+
+        { "type": "row", "title": "Voice Breakdown", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "collapsed": false },
+
+        {
+          "id": 30, "type": "piechart", "title": "Requests by Voice (1h)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "sum(increase(kokoro_requests_total{namespace=\"production\"}[1h])) by (voice)",
+            "legendFormat": "{{ voice }}"
+          }]
+        },
+
+        {
+          "id": 31, "type": "timeseries", "title": "Request Rate by Voice",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(kokoro_requests_total{namespace=\"production\"}[2m])) by (voice)",
+            "legendFormat": "{{ voice }}"
+          }]
+        },
+
+        {
+          "id": 32, "type": "timeseries", "title": "Inference Latency by Voice (p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum(rate(kokoro_inference_seconds_bucket{namespace=\"production\"}[5m])) by (le, voice))",
+            "legendFormat": "{{ voice }}"
+          }]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }, "collapsed": false },
+
+        {
+          "id": 40, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"tts-microservice-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 41, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"tts-microservice-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 42, "type": "timeseries", "title": "Pod Restarts",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"production\", pod=~\"tts-microservice-.*\"}[1h])",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 }, "collapsed": false },
+
+        {
+          "id": 50, "type": "logs", "title": "TTS Microservice Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 39 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:tts-microservice*",
+            "queryType": "lucene",
+            "timeField": "@timestamp",
+            "metrics": [{ "type": "logs", "id": "1" }]
+          }]
+        }
+      ]
+    }
