@@ -167,3 +167,46 @@ spec:
             summary: "llm-service exporter queue nearing capacity"
             description: >-
               Exporter queue depth is {{ $value }} (capacity: 5000). Risk of dropped logs/metrics.
+
+    - name: llm-service.downstream
+      interval: 30s
+      rules:
+        - alert: LlmServiceHighDownstreamErrorRate
+          expr: |
+            sum(rate(llm_downstream_errors_total[5m])) by (service) > 0.5
+          for: 3m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service downstream {{ $labels.service }} error rate elevated"
+            description: >-
+              {{ $labels.service }} is returning {{ $value | printf "%.1f" }} errors/sec over the last 5 minutes.
+
+        - alert: LlmServiceLLMProviderErrors
+          expr: |
+            sum(rate(llm_provider_errors_total[5m])) > 0.2
+          for: 3m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service LLM provider errors elevated"
+            description: >-
+              LLM provider returning {{ $value | printf "%.2f" }} errors/sec. Check model {{ $labels.model }} status code {{ $labels.status_code }}.
+
+        - alert: LlmServiceLLMProviderHighRateLimiting
+          expr: |
+            sum(rate(llm_provider_errors_total{status_code="429"}[5m])) > 0.5
+          for: 2m
+          labels:
+            severity: warning
+            service: llm-service
+            namespace: production
+          annotations:
+            summary: "llm-service hitting LLM provider rate limits"
+            description: >-
+              Receiving {{ $value | printf "%.1f" }} 429 responses/sec from the LLM provider.
+

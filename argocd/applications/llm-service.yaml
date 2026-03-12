@@ -34,7 +34,7 @@ spec:
       targetRevision: main
       path: kubernetes/base/llm-service
       directory:
-        include: "{alerts,alertmanager-config,sealed-secret}.yaml"
+        include: "{alerts,alertmanager-config,sealed-secret,grafana-dashboard}.yaml"
 
   destination:
     server: https://kubernetes.default.svc
