@@ -75,12 +75,14 @@ spec:
         # -------------------------------------------------------------------
         - alert: TtsMicroserviceGpuOom
           expr: |
-            increase(
-              kube_pod_container_status_last_terminated_reason{
-                namespace="production",
-                pod=~"tts-microservice-.*",
-                reason="OOMKilled"
-              }[30m]
+            max by (pod) (
+              max_over_time(
+                kube_pod_container_status_last_terminated_reason{
+                  namespace="production",
+                  pod=~"tts-microservice-.*",
+                  reason="OOMKilled"
+                }[30m]
+              )
             ) > 0
           for: 0m
           labels:
@@ -108,6 +110,8 @@ spec:
               /
               sum(rate(kokoro_requests_total{namespace="production"}[5m]))
             ) > 0.05
+            and
+            sum(rate(kokoro_requests_total{namespace="production"}[5m])) > 0
           for: 2m
           labels:
             severity: warning
