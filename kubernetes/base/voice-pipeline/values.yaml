@@ -84,11 +84,8 @@ serviceMonitor:
   enabled: true
   path: /metrics
 
-# Grafana dashboard: grafana-dashboard.json in this directory.
-# Import via Grafana UI (Dashboards → Import → paste JSON) or wrap in a
-# ConfigMap with the grafana_dashboard=1 label for auto-provisioning.
-# The dashboard uses ${DS_PROMETHEUS} datasource variable — update the UID
-# to match your Grafana Prometheus datasource after import.
+# Grafana dashboard: auto-provisioned via grafana-dashboard.yaml ConfigMap
+# (deployed by ArgoCD as a raw manifest alongside alerts).
 
 config:
   ENV: "production"

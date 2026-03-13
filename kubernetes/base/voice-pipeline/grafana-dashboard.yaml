@@ -39,7 +39,7 @@ data:
               "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
           },
           "targets": [{
-            "expr": "sum(rate(voice_pipeline_jobs_failed_total[5m])) / sum(rate(voice_pipeline_jobs_received_total[5m]))",
+            "expr": "sum(rate(voice_pipeline_jobs_failed_total[5m])) / clamp_min(sum(rate(voice_pipeline_jobs_received_total[5m])), 1e-10)",
             "legendFormat": "failure rate"
           }]
         },
