@@ -1,0 +1,114 @@
+# =============================================================================
+# pipeline-worker — Celery workers for the video rendering pipeline
+# =============================================================================
+nameOverride: pipeline-worker
+
+image:
+  repository: ghcr.io/profjim-inc/pipeline-deployment
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# Metrics HTTP server port (prometheus_client.start_http_server).
+# Workers have no web server — this port serves /metrics only.
+containerPort: 9090
+
+# Override the Dockerfile CMD to start all four Celery worker queues in one pod.
+# Each queue gets its own process with appropriate concurrency.
+# The metrics server (port 9090) is started by the first worker via Celery signals.
+command: ["/bin/bash", "-c"]
+args:
+  - |
+    celery -A bolt worker -l INFO -c 1 -P eventlet -Q main -n main@%h &
+    celery -A bolt worker -l INFO -c 5 -P eventlet -Q speechengine -n speechengine@%h &
+    celery -A bolt worker -l INFO -c 7 -P eventlet -Q syntheticengine -n syntheticengine@%h &
+    celery -A bolt worker -l INFO -c 1 -P eventlet -Q videoengine2 -n videoengine2@%h &
+    wait -n
+    exit $?
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+
+# No HTTP server — disable probes
+probes:
+  liveness:
+    enabled: false
+  readiness:
+    enabled: false
+
+# Workers are fixed-size — disable HPA
+autoscaling:
+  enabled: false
+
+# Fixed replica count (scale manually based on queue depth)
+replicaCount: 2
+
+# No external traffic
+ingress:
+  enabled: false
+
+# Video rendering is CPU-intensive
+nodeSelector:
+  pool: compute
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Long-running video jobs need time to finish on shutdown
+terminationGracePeriodSeconds: 120
+
+commonLabels:
+  team: backend
+  tier: internal
+  cost-center: engineering
+
+# Metrics served by prometheus_client on port 9090
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+config:
+  ENV: "Ubuntu_cloud"
+  SERVICE_NAME: "pipeline-worker"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  WORKER: "all"
+  METRICS_PORT: "9090"
+
+secretRefs:
+  - name: pipeline-worker-secrets
+    key: DJANGO_SECRET_KEY
+  - name: pipeline-worker-secrets
+    key: db_user
+  - name: pipeline-worker-secrets
+    key: db_password
+  - name: pipeline-worker-secrets
+    key: AWS_ACCESS_KEY_ID
+  - name: pipeline-worker-secrets
+    key: AWS_SECRET_ACCESS_KEY
+  - name: pipeline-worker-secrets
+    key: OPENSEARCH_URL
+  - name: pipeline-worker-secrets
+    key: OPENSEARCH_USER
+  - name: pipeline-worker-secrets
+    key: OPENSEARCH_PASSWORD
+  # RabbitMQ broker URL (amqp://user:pass@host:5672)
+  - name: pipeline-worker-secrets
+    key: CELERY_BROKER_URL
+  # Azure credentials
+  - name: pipeline-worker-secrets
+    key: AZURE_TENANT_ID
+  - name: pipeline-worker-secrets
+    key: AZURE_CLIENT_ID
+  - name: pipeline-worker-secrets
+    key: AZURE_CLIENT_SECRET

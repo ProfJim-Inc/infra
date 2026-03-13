@@ -1,0 +1,226 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pipeline-worker
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: pipeline-worker
+spec:
+  groups:
+    - name: pipeline-worker.availability
+      interval: 30s
+      rules:
+        - alert: PipelineWorkerDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"pipeline-worker.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker has no running pods"
+            description: >-
+              All pipeline-worker replicas are unavailable for > 1 minute.
+              Video rendering pipeline is completely down.
+            runbook: "kubectl rollout status deployment/pipeline-worker -n production"
+
+        - alert: PipelineWorkerPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"pipeline-worker-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: pipeline-worker.resources
+      interval: 30s
+      rules:
+        - alert: PipelineWorkerHighCPU
+          expr: |
+            (
+              sum(rate(container_cpu_usage_seconds_total{
+                namespace="production",
+                pod=~"pipeline-worker-.*"
+              }[5m])) by (pod)
+              /
+              sum(kube_pod_container_resource_limits{
+                namespace="production",
+                pod=~"pipeline-worker-.*",
+                resource="cpu"
+              }) by (pod)
+            ) > 0.9
+          for: 10m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker pod {{ $labels.pod }} CPU above 90%"
+            description: >-
+              Pod {{ $labels.pod }} has been using more than 90% of its CPU limit
+              for 10 minutes. Video rendering may be degraded.
+
+        - alert: PipelineWorkerHighMemory
+          expr: |
+            (
+              sum(container_memory_working_set_bytes{
+                namespace="production",
+                pod=~"pipeline-worker-.*"
+              }) by (pod)
+              /
+              sum(kube_pod_container_resource_limits{
+                namespace="production",
+                pod=~"pipeline-worker-.*",
+                resource="memory"
+              }) by (pod)
+            ) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker pod {{ $labels.pod }} memory above 85%"
+            description: >-
+              Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit.
+              Risk of OOMKill if usage continues to climb.
+            runbook: "kubectl top pod {{ $labels.pod }} -n production"
+
+        - alert: PipelineWorkerOOMKilled
+          expr: |
+            increase(
+              kube_pod_container_status_last_terminated_reason{
+                namespace="production",
+                pod=~"pipeline-worker-.*",
+                reason="OOMKilled"
+              }[15m]
+            ) > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker pod {{ $labels.pod }} was OOMKilled"
+            description: >-
+              Pod {{ $labels.pod }} was terminated due to exceeding memory limits.
+              Consider increasing memory limits in values.yaml.
+
+    - name: pipeline-worker.business
+      interval: 60s
+      rules:
+        - alert: PipelineHighJobFailureRate
+          expr: |
+            (
+              rate(pipeline_jobs_completed_total{status="failed"}[15m])
+              /
+              rate(pipeline_jobs_completed_total[15m])
+            ) > 0.20
+          for: 5m
+          labels:
+            severity: critical
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker job failure rate above 20%"
+            description: >-
+              {{ $value | humanizePercentage }} of video rendering jobs are failing
+              over the last 15 minutes.
+
+        - alert: PipelineSlowJobDuration
+          expr: |
+            histogram_quantile(0.95,
+              rate(pipeline_job_duration_seconds_bucket{stage="total"}[30m])
+            ) > 3600
+          for: 10m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker P95 job duration above 1 hour"
+            description: >-
+              95th percentile total job duration is {{ $value | humanizeDuration }}.
+
+        - alert: PipelineSlowSpeechGeneration
+          expr: |
+            histogram_quantile(0.95,
+              rate(pipeline_speech_generation_seconds_bucket[15m])
+            ) > 600
+          for: 5m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker P95 speech generation above 10 minutes"
+            description: >-
+              95th percentile Azure TTS call duration is {{ $value | humanizeDuration }}.
+              Check Azure Cognitive Services status.
+
+        - alert: PipelineSlowSyntheticVideo
+          expr: |
+            histogram_quantile(0.95,
+              rate(pipeline_synthetic_video_seconds_bucket[30m])
+            ) > 1800
+          for: 10m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker P95 avatar video generation above 30 minutes"
+            description: >-
+              95th percentile synthetic video duration for provider {{ $labels.provider }}
+              is {{ $value | humanizeDuration }}.
+
+        - alert: PipelineHighExternalAPIErrors
+          expr: |
+            (
+              rate(pipeline_external_api_calls_total{status="error"}[10m])
+              /
+              rate(pipeline_external_api_calls_total[10m])
+            ) > 0.10
+          for: 5m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker external API error rate above 10% for {{ $labels.service }}"
+            description: >-
+              {{ $value | humanizePercentage }} of calls to {{ $labels.service }}
+              are failing over the last 10 minutes.
+
+        - alert: PipelineHighRetryRate
+          expr: |
+            rate(pipeline_task_retries_total[15m]) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            service: pipeline-worker
+            namespace: production
+          annotations:
+            summary: "pipeline-worker high task retry rate on {{ $labels.queue }} queue"
+            description: >-
+              Queue {{ $labels.queue }} is seeing {{ $value | printf "%.1f" }} retries/sec
+              over the last 15 minutes.
