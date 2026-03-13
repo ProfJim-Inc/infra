@@ -43,6 +43,7 @@ spec:
     - "https://nvidia.github.io/k8s-device-plugin"
     - "https://grafana.github.io/helm-charts"
     - "https://open-telemetry.github.io/opentelemetry-helm-charts"
+    - "https://charts.bitnami.com/bitnami"
     - "https://charts.jetstack.io"
     - "https://argoproj.github.io/argo-helm"
 

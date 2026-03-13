@@ -109,6 +109,15 @@ spec:
           # Never: only use the local cache (useful for air-gapped environments).
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
           ports:
             # Named port "http" — referenced by the Service and health probes below.
             # Using a name instead of a number makes it easy to change the port

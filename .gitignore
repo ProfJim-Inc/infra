@@ -8,10 +8,15 @@ terraform.tfvars
 crash.log
 
 # Secrets — never commit these
+# kubernetes/secrets/ contains K8s Secret YAML templates with REPLACE_ME
+# placeholders. Fill in real values locally and apply with kubectl.
+# Templates: rabbitmq-credentials, rabbitmq-app-credentials,
+#            voice-pipeline-secrets, alertmanager-slack-secret
 .env
 *.pem
 *.key
 credentials.json
+kubernetes/secrets/
 
 # OS
 .DS_Store
@@ -25,4 +30,4 @@ Thumbs.db
 
 # Helm
 *.tgz
-.claude/settings.json
+.claude/
