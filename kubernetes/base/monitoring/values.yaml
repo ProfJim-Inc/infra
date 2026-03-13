@@ -203,16 +203,29 @@ alertmanager:
       matchLabels: {}
 
 # =============================================================================
+# Kubelet scraping — LKE uses self-signed certs on port 10250
+# =============================================================================
+kubelet:
+  serviceMonitor:
+    https: true
+    insecureSkipVerify: true
+    cAdvisor: true
+    cAdvisorMetricRelabelings:
+      - sourceLabels: [__name__]
+        action: keep
+        regex: "container_(cpu_usage_seconds_total|memory_working_set_bytes|network_.*|fs_.*)"
+
+# =============================================================================
 # Prometheus Operator — move kubelet Service out of kube-system
 # =============================================================================
 prometheusOperator:
   nodeSelector:
     pool: system
-  # By default the kubelet Service is created in kube-system.
-  # Moving it to monitoring avoids needing kube-system in the ArgoCD project.
+  # Keep kubelet Service in kube-system (default) so the Prometheus Operator's
+  # generated SD config (which hardcodes kube-system) can discover the endpoints.
   kubeletService:
     enabled: true
-    namespace: monitoring
+    namespace: kube-system
 
 # =============================================================================
 # Node Exporter — runs on ALL nodes (DaemonSet, no nodeSelector)

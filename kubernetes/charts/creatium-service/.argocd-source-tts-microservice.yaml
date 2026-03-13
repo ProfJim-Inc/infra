@@ -1,0 +1,8 @@
+helm:
+  parameters:
+  - name: image.repository
+    value: ghcr.io/profjim-inc/tts-microservice
+    forcestring: true
+  - name: image.tag
+    value: 1.0.3
+    forcestring: true

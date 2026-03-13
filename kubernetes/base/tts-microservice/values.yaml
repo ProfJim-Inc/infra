@@ -2,8 +2,8 @@
 nameOverride: tts-microservice
 
 image:
-  repository: ghcr.io/creatium/tts-microservice
-  tag: "latest"
+  repository: ghcr.io/profjim-inc/tts-microservice
+  tag: "0.1.0"
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -13,12 +13,12 @@ containerPort: 9000
 
 resources:
   requests:
-    cpu: 2000m
+    cpu: 4000m
     memory: 8Gi
     nvidia.com/gpu: "1"
   limits:
-    cpu: 4000m
-    memory: 16Gi
+    cpu: 12000m
+    memory: 24Gi
     nvidia.com/gpu: "1"
 
 probes:
@@ -61,6 +61,10 @@ tolerations:
   - key: nvidia.com/gpu
     operator: Exists
     effect: NoSchedule
+  - key: workload-type
+    operator: Equal
+    value: gpu
+    effect: NoSchedule
 
 commonLabels:
   team: backend
@@ -69,26 +73,25 @@ commonLabels:
 
 serviceMonitor:
   enabled: true
-  path: /metrics
+  path: /metrics/
 
 config:
-  KOKORO_OPENSEARCH_LOGGING: "true"
-  KOKORO_OPENSEARCH_INDEX: "tts-logs"
-  OPENSEARCH_HOST: "opensearch-cluster-master.logging.svc.cluster.local"
-  OPENSEARCH_PORT: "9200"
-  OPENSEARCH_USE_SSL: "false"
+  SERVICE_NAME: "tts-microservice"
+  # SERVICE_VERSION is read from the VERSION file baked into the Docker image.
+  # It auto-updates on every release — no need to maintain it here.
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
   KOKORO_TF32: "true"
   KOKORO_MAX_CONNECTIONS: "50"
 
-# Secrets must be pre-created as K8s Secrets:
-#   kubectl create secret generic tts-secrets -n production \
-#     --from-literal=KOKORO_API_KEY=<key> \
-#     --from-literal=AZURE_STORAGE_CONNECTION_STRING=<conn-string>
+# Secrets are managed via SealedSecret (see sealed-secret.yaml).
+# The "tts-secrets" K8s Secret is created automatically by the SealedSecret controller.
 secretRefs:
   - name: tts-secrets
-    key: KOKORO_API_KEY
-  - name: tts-secrets
     key: AZURE_STORAGE_CONNECTION_STRING
+  - name: tts-secrets
+    key: OPENSEARCH_HOST
   - name: tts-secrets
     key: OPENSEARCH_USER
   - name: tts-secrets

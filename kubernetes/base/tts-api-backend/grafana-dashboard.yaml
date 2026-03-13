@@ -1,0 +1,260 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tts-api-backend-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  tts-api-backend.json: |
+    {
+      "title": "TTS API Backend",
+      "uid": "tts-api-backend",
+      "tags": ["tts", "api", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Request Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(tts_requests_total{pod=~\"tts-api-backend-.*\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Error Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "error rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(tts_requests_total{pod=~\"tts-api-backend-.*\", status=\"error\"}[2m])) / sum(rate(tts_requests_total{pod=~\"tts-api-backend-.*\"}[2m]))",
+            "legendFormat": "error rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "TTFB Percentiles",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(tts_ttfb_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_ttfb_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(tts_ttfb_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Running Pods",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 1 },
+                { "color": "green", "value": 2 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"tts-api-backend\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        { "type": "row", "title": "TTS Performance", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 5, "type": "timeseries", "title": "Request Duration by Provider",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(tts_request_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le, provider))", "legendFormat": "p50 {{ provider }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_request_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le, provider))", "legendFormat": "p95 {{ provider }}" }
+          ]
+        },
+
+        {
+          "id": 6, "type": "timeseries", "title": "Provider Latency vs API Overhead",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_provider_latency_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le, provider))", "legendFormat": "provider p95 {{ provider }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_api_overhead_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le, provider))", "legendFormat": "overhead p95 {{ provider }}" }
+          ]
+        },
+
+        {
+          "id": 7, "type": "timeseries", "title": "Characters Processed / sec",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(tts_characters_processed_total{pod=~\"tts-api-backend-.*\"}[2m])) by (provider)",
+            "legendFormat": "{{ provider }}"
+          }]
+        },
+
+        { "type": "row", "title": "Provider Health", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }, "collapsed": false },
+
+        {
+          "id": 8, "type": "timeseries", "title": "Provider Error Rate",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 15 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(tts_provider_errors_total{pod=~\"tts-api-backend-.*\"}[2m])) by (provider)",
+            "legendFormat": "{{ provider }}"
+          }]
+        },
+
+        {
+          "id": 9, "type": "timeseries", "title": "Provider Fallbacks / sec",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 15 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(tts_provider_fallbacks_total{pod=~\"tts-api-backend-.*\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 10, "type": "stat", "title": "Active WebSocket Connections",
+          "gridPos": { "h": 6, "w": 4, "x": 16, "y": 15 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 50 },
+                { "color": "red", "value": 100 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(tts_active_websocket_connections{pod=~\"tts-api-backend-.*\"})",
+            "legendFormat": "connections"
+          }]
+        },
+
+        {
+          "id": 11, "type": "stat", "title": "Pronunciation Cache Size",
+          "gridPos": { "h": 6, "w": 4, "x": 20, "y": 15 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "max(tts_pronunciation_cache_size{pod=~\"tts-api-backend-.*\"})",
+            "legendFormat": "entries"
+          }]
+        },
+
+        { "type": "row", "title": "Latency Breakdown", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 }, "collapsed": false },
+
+        {
+          "id": 12, "type": "timeseries", "title": "Auth Duration (p95)",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 22 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_auth_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le, cache_hit))", "legendFormat": "cache_hit={{ cache_hit }}" }
+          ]
+        },
+
+        {
+          "id": 13, "type": "timeseries", "title": "Voice Config Duration (p95)",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 22 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_voice_config_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 14, "type": "timeseries", "title": "Connector Init Duration (p95)",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 22 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_connector_init_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le, provider))", "legendFormat": "{{ provider }}" }
+          ]
+        },
+
+        {
+          "id": 15, "type": "timeseries", "title": "Pronunciation Lookup + Apply (p95)",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 22 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_pronunciation_lookup_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le))", "legendFormat": "lookup p95" },
+            { "expr": "histogram_quantile(0.95, sum(rate(tts_pronunciation_apply_duration_seconds_bucket{pod=~\"tts-api-backend-.*\"}[5m])) by (le))", "legendFormat": "apply p95" }
+          ]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 }, "collapsed": false },
+
+        {
+          "id": 16, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 29 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"tts-api-backend-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 17, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 29 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"tts-api-backend-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 18, "type": "timeseries", "title": "HPA Replicas",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 29 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [
+            { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"production\", horizontalpodautoscaler=~\"tts-api-backend.*\"}", "legendFormat": "desired" },
+            { "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"production\", horizontalpodautoscaler=~\"tts-api-backend.*\"}", "legendFormat": "current" },
+            { "expr": "kube_horizontalpodautoscaler_spec_min_replicas{namespace=\"production\", horizontalpodautoscaler=~\"tts-api-backend.*\"}", "legendFormat": "min" },
+            { "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace=\"production\", horizontalpodautoscaler=~\"tts-api-backend.*\"}", "legendFormat": "max" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }, "collapsed": false },
+
+        {
+          "id": 19, "type": "logs", "title": "Recent Logs",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
+          "datasource": { "uid": "opensearch" },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:tts-api-backend*",
+            "queryType": "lucene",
+            "metrics": [{ "type": "logs", "id": "1" }],
+            "timeField": "@timestamp"
+          }]
+        }
+
+      ]
+    }

@@ -6,7 +6,7 @@ nameOverride: equiphon
 
 image:
   repository: ghcr.io/profjim-inc/equiphon
-  tag: "0.1.2"   # managed by ArgoCD Image Updater (semver strategy)
+  tag: "1.0.11"   # managed by ArgoCD Image Updater (semver strategy)
 
 imagePullSecrets:
   - name: ghcr-pull-secret

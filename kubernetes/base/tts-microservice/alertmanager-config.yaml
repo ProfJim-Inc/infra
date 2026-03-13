@@ -1,0 +1,79 @@
+# =============================================================================
+# AlertmanagerConfig — tts-microservice Slack routing
+#
+# Prometheus Operator automatically scopes this config to alerts that carry
+# namespace="production" (matching the namespace of this CR).
+#
+# Routing logic:
+#   severity=critical  → #alerts-critical (immediate, also notifies #alerts)
+#   severity=warning   → #alerts (grouped, 5-minute batching)
+#
+# Required secret (create once per namespace):
+#   kubectl create secret generic alertmanager-slack-secret \
+#     -n production \
+#     --from-literal=webhook_url=https://hooks.slack.com/services/XXXXX/YYYYY/ZZZZZ
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: tts-microservice
+  namespace: production
+  labels:
+    app.kubernetes.io/name: tts-microservice
+spec:
+  route:
+    receiver: slack-warnings
+    groupBy:
+      - alertname
+      - service
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    matchers:
+      - name: service
+        value: tts-microservice
+    routes:
+      - receiver: slack-critical
+        matchers:
+          - name: severity
+            value: critical
+        groupWait: 0s
+        repeatInterval: 1h
+        continue: true
+
+  receivers:
+    - name: slack-warnings
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: webhook_url
+          channel: "#alerts"
+          sendResolved: true
+          iconEmoji: ":warning:"
+          title: |
+            [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *Summary:* {{ .Annotations.summary }}
+            *Description:* {{ .Annotations.description }}
+            *Severity:* `{{ .Labels.severity }}`  |  *Service:* `{{ .Labels.service }}`
+            {{ if .Annotations.runbook }}*Runbook:* {{ .Annotations.runbook }}{{ end }}
+            {{ end }}
+
+    - name: slack-critical
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: webhook_url
+          channel: "#alerts-critical"
+          sendResolved: true
+          iconEmoji: ":rotating_light:"
+          title: |
+            :rotating_light: [CRITICAL{{ if eq .Status "resolved" }} — RESOLVED{{ end }}] {{ .GroupLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *Summary:* {{ .Annotations.summary }}
+            *Description:* {{ .Annotations.description }}
+            *Service:* `{{ .Labels.service }}`  |  *Namespace:* `{{ .Labels.namespace }}`
+            {{ if .Annotations.runbook }}*Immediate action:* `{{ .Annotations.runbook }}`{{ end }}
+            {{ end }}
