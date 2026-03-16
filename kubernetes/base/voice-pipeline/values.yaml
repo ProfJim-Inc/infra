@@ -63,6 +63,12 @@ ingress:
 nodeSelector:
   pool: compute
 
+tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "compute"
+    effect: "NoSchedule"
+
 # Ensure each pod lands on a separate compute node (pod takes nearly full node)
 affinity:
   podAntiAffinity:
