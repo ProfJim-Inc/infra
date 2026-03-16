@@ -10,11 +10,6 @@ global:
   security:
     allowInsecureImages: true
 
-# -- Debug (temporary — remove after RabbitMQ starts successfully)
-extraEnvVars:
-  - name: BITNAMI_DEBUG
-    value: "true"
-
 # -- Image override
 image:
   registry: docker.io
@@ -52,6 +47,11 @@ resources:
   limits:
     cpu: 1000m
     memory: 1Gi
+
+# -- Disable secret checksum annotation to prevent unnecessary restarts.
+# If you rotate the RabbitMQ password, manually restart: kubectl delete pod rabbitmq-0 -n production
+podAnnotations:
+  checksum/secret: "static"
 
 # -- Node placement
 nodeSelector:

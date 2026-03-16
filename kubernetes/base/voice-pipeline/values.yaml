@@ -5,7 +5,7 @@ nameOverride: voice-pipeline
 
 image:
   repository: ghcr.io/profjim-inc/creatium-voice-pipeline
-  tag: "7b05c16"   # overridden by CI/CD with Git SHA on every merge
+  tag: "6f7cdae"   # overridden by CI/CD with Git SHA on every merge
   pullPolicy: Always
 
 imagePullSecrets:
@@ -104,7 +104,7 @@ config:
   MAX_WORKERS: "30"
   BATCH_SIZE: "10"
   TIMEOUT_SECONDS: "300"
-  AZURE_QUEUE_NAME: "creatium-narrateaudio"
+  AZURE_QUEUE_NAME: "testing-queue"
 
 # Secrets must be pre-created as K8s Secrets:
 #   kubectl create secret generic voice-pipeline-secrets -n production \
@@ -135,3 +135,33 @@ secretRefs:
     key: SPEECH_MODIFIER_URL
   - name: voice-pipeline-secrets
     key: ERROR_LOG_URL_PREFIX
+  - name: voice-pipeline-secrets
+    key: WEBHOOK_API_KEY
+  - name: voice-pipeline-secrets
+    key: CARTESIA_API_KEY
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_HOST
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_INDEX_NAME
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_PASSWORD
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_PORT
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_USERNAME
+  - name: voice-pipeline-secrets
+    key: DEBUG
+  - name: voice-pipeline-secrets
+    key: ENVIRONMENT
+  - name: voice-pipeline-secrets
+    key: INWORLD_API_KEY
+  - name: voice-pipeline-secrets
+    key: KOKORO_API_KEY
+  - name: voice-pipeline-secrets
+    key: KOKORO_MANAGER_URL
+  - name: voice-pipeline-secrets
+    key: LOG_FILE_PATH
+  - name: voice-pipeline-secrets
+    key: LOG_FORMAT
+  - name: voice-pipeline-secrets
+    key: LOG_GROUP_NAME
