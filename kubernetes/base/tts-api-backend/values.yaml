@@ -5,7 +5,7 @@ nameOverride: tts-api-backend
 
 image:
   repository: ghcr.io/profjim-inc/tts-api-backend
-  tag: "de82511"   # overridden by CI/CD with Git SHA on every merge
+  tag: "d5c93f4"   # overridden by CI/CD with Git SHA on every merge
 
 imagePullSecrets:
   - name: ghcr-pull-secret
