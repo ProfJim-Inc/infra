@@ -5,6 +5,16 @@
 # Docs: https://github.com/bitnami/charts/tree/main/bitnami/rabbitmq
 # =============================================================================
 
+# -- Image: Bitnami removed images from docker.io/bitnami, use legacy registry
+image:
+  registry: docker.io
+  repository: bitnamilegacy/rabbitmq
+
+volumePermissions:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/os-shell
+
 # -- Authentication
 # The Bitnami chart creates the RabbitMQ user using the password from the
 # rabbitmq-credentials K8s Secret (created manually, gitignored templates
