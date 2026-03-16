@@ -1,0 +1,93 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rabbitmq
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: rabbitmq
+spec:
+  groups:
+    - name: rabbitmq.availability
+      interval: 30s
+      rules:
+        - alert: RabbitMQDown
+          expr: |
+            up{job=~".*rabbitmq.*", namespace="production"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: rabbitmq
+            namespace: production
+          annotations:
+            summary: "RabbitMQ is unreachable"
+            description: "RabbitMQ has been down for more than 1 minute."
+            runbook: "kubectl get pods -n production -l app.kubernetes.io/name=rabbitmq"
+
+        - alert: RabbitMQPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"rabbitmq-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: rabbitmq
+            namespace: production
+          annotations:
+            summary: "RabbitMQ pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+
+    - name: rabbitmq.performance
+      interval: 30s
+      rules:
+        - alert: RabbitMQHighMemoryUsage
+          expr: |
+            rabbitmq_process_resident_memory_bytes{namespace="production"}
+            /
+            rabbitmq_resident_memory_limit_bytes{namespace="production"}
+            > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            service: rabbitmq
+            namespace: production
+          annotations:
+            summary: "RabbitMQ memory usage above 80%"
+            description: >-
+              RabbitMQ is using {{ $value | humanizePercentage }} of its memory limit.
+
+        - alert: RabbitMQQueueBacklog
+          expr: |
+            sum(rabbitmq_queue_messages{namespace="production"}) > 5000
+          for: 30m
+          labels:
+            severity: warning
+            service: rabbitmq
+            namespace: production
+          annotations:
+            summary: "RabbitMQ total queue depth above 1000"
+            description: >-
+              Total messages across all queues: {{ $value | printf "%.0f" }}.
+              Consumers may be falling behind.
+
+        - alert: RabbitMQNoConsumers
+          expr: |
+            rabbitmq_queue_consumers{namespace="production"} == 0
+            and
+            rabbitmq_queue_messages{namespace="production"} > 0
+          for: 5m
+          labels:
+            severity: critical
+            service: rabbitmq
+            namespace: production
+          annotations:
+            summary: "RabbitMQ queue {{ $labels.queue }} has messages but no consumers"
+            description: >-
+              Queue {{ $labels.queue }} has {{ $value | printf "%.0f" }} messages
+              but no consumers attached.
