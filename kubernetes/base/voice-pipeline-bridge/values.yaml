@@ -16,7 +16,7 @@ imagePullSecrets:
   - name: ghcr-pull-secret
 
 # Override the Dockerfile CMD to run the bridge script instead
-command: ["python3", "send_to_rabbit.py"]
+command: ["python3", "-u", "send_to_rabbit.py"]
 
 # Health check server listens on 8080 (from the bridge's own health thread)
 containerPort: 8080
