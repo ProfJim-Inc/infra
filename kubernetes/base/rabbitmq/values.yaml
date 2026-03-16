@@ -10,6 +10,11 @@ global:
   security:
     allowInsecureImages: true
 
+# -- Debug (temporary — remove after RabbitMQ starts successfully)
+extraEnvVars:
+  - name: BITNAMI_DEBUG
+    value: "true"
+
 # -- Image override
 image:
   registry: docker.io
