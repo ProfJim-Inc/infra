@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: emotion-detection-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  emotion-detection.json: |
+    {
+      "title": "Emotion Detection Service",
+      "uid": "emotion-detection",
+      "tags": ["emotion-detection", "onnx", "whisper", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Prediction Rate (by endpoint)",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(emotion_predictions_total{namespace=\"production\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Prediction Rate (by emotion)",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(emotion_predictions_total{namespace=\"production\"}[2m])) by (emotion)",
+            "legendFormat": "{{ emotion }}"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "Prediction Latency Percentiles",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(emotion_prediction_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(emotion_prediction_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(emotion_prediction_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Active WebSocket Connections",
+          "gridPos": { "h": 3, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 20 },
+                { "color": "red", "value": 40 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(emotion_ws_connections_active{namespace=\"production\"}) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 5, "type": "stat", "title": "Pod Status",
+          "gridPos": { "h": 3, "w": 6, "x": 18, "y": 4 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 1 },
+                { "color": "green", "value": 2 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=~\"emotion-detection.*\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        { "type": "row", "title": "Latency Breakdown", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Prediction Latency by Endpoint",
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(emotion_prediction_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le, endpoint))", "legendFormat": "p50 {{ endpoint }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(emotion_prediction_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le, endpoint))", "legendFormat": "p95 {{ endpoint }}" },
+            { "expr": "histogram_quantile(0.99, sum(rate(emotion_prediction_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le, endpoint))", "legendFormat": "p99 {{ endpoint }}" }
+          ]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "Transcription Latency (Whisper STT)",
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(emotion_transcription_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(emotion_transcription_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(emotion_transcription_latency_seconds_bucket{namespace=\"production\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 40, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"emotion-detection-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 41, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"emotion-detection-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 42, "type": "timeseries", "title": "Pod Restarts",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"production\", pod=~\"emotion-detection-.*\"}[1h])",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }, "collapsed": false },
+
+        {
+          "id": 50, "type": "logs", "title": "Emotion Detection Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 23 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:emotion-detection*",
+            "queryType": "lucene",
+            "timeField": "@timestamp",
+            "metrics": [{ "type": "logs", "id": "1" }]
+          }]
+        }
+      ]
+    }

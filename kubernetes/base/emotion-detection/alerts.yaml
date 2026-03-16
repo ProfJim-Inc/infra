@@ -1,0 +1,125 @@
+# =============================================================================
+# emotion-detection PrometheusRules
+#
+# Alert rules for the emotion detection inference service:
+#   EmotionDetectionDown            -> critical -> Slack #alerts-critical (+ #alerts)
+#   EmotionDetectionPodCrashLooping -> warning  -> Slack #alerts
+#   EmotionDetectionOom             -> critical -> Slack #alerts-critical (+ #alerts)
+#   EmotionDetectionHighLatencyP99  -> warning  -> Slack #alerts
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: emotion-detection
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: emotion-detection
+spec:
+  groups:
+    - name: emotion-detection.availability
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # No running pods — full emotion detection outage
+        # -------------------------------------------------------------------
+        - alert: EmotionDetectionDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"emotion-detection.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: emotion-detection
+            namespace: production
+          annotations:
+            summary: "emotion-detection has no running pods"
+            description: >-
+              All emotion-detection replicas are unavailable for > 1 minute.
+              Emotion classification and audio emotion detection are fully offline.
+            runbook: "kubectl describe pod -l app=emotion-detection -n production && kubectl get events -n production --sort-by=.lastTimestamp | tail -20"
+
+        # -------------------------------------------------------------------
+        # Pod crash-looping — model loading failures or OOM during startup
+        # -------------------------------------------------------------------
+        - alert: EmotionDetectionPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"emotion-detection-.*"
+              }[15m]
+            ) > 2
+          for: 0m
+          labels:
+            severity: warning
+            service: emotion-detection
+            namespace: production
+          annotations:
+            summary: "emotion-detection pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times
+              in the last 15 minutes. Model loading takes ~2-3s per restart.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+        # -------------------------------------------------------------------
+        # OOM kill — memory limit (1Gi) exceeded
+        # -------------------------------------------------------------------
+        - alert: EmotionDetectionOom
+          expr: |
+            max by (pod) (
+              max_over_time(
+                kube_pod_container_status_last_terminated_reason{
+                  namespace="production",
+                  pod=~"emotion-detection-.*",
+                  reason="OOMKilled"
+                }[30m]
+              )
+            ) > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: emotion-detection
+            namespace: production
+          annotations:
+            summary: "emotion-detection pod OOM killed"
+            description: >-
+              Pod {{ $labels.pod }} was OOM killed. Check memory limits
+              and concurrent request load. Both ONNX emotion model and Whisper
+              tiny run in the same process (~350MB typical, up to ~700MB under heavy load).
+            runbook: "kubectl describe pod {{ $labels.pod }} -n production"
+
+    - name: emotion-detection.slos
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # P99 prediction latency > 500ms over 5 minutes
+        # Normal: p95 = 23.69ms under load. 500ms indicates severe degradation.
+        # -------------------------------------------------------------------
+        - alert: EmotionDetectionHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(emotion_prediction_latency_seconds_bucket{namespace="production"}[5m])
+              ) by (le, endpoint)
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            service: emotion-detection
+            namespace: production
+          annotations:
+            summary: "emotion-detection P99 latency above 500ms"
+            description: >-
+              P99 prediction latency for endpoint {{ $labels.endpoint }} is
+              {{ $value | humanizeDuration }} over the last 5 minutes.
+              Normal P95 under load is ~24ms. Check for CPU throttling or
+              excessive concurrent requests.
