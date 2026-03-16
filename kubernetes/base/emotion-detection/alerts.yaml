@@ -27,12 +27,21 @@ spec:
         # -------------------------------------------------------------------
         - alert: EmotionDetectionDown
           expr: |
-            sum(
+            (
+              sum(
+                kube_deployment_status_replicas_available{
+                  namespace="production",
+                  deployment=~"emotion-detection.*"
+                }
+              ) == 0
+            )
+            or
+            absent(
               kube_deployment_status_replicas_available{
                 namespace="production",
                 deployment=~"emotion-detection.*"
               }
-            ) == 0
+            )
           for: 1m
           labels:
             severity: critical

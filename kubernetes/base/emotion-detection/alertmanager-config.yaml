@@ -27,6 +27,8 @@ spec:
       - name: service
         value: emotion-detection
     routes:
+      # Critical alerts hit #alerts-critical first, then continue to the
+      # catch-all sibling below so they also appear in #alerts.
       - receiver: slack-critical
         matchers:
           - name: severity
@@ -34,6 +36,8 @@ spec:
         groupWait: 0s
         repeatInterval: 1h
         continue: true
+      # Catch-all sibling — receives all alerts (including critical via continue)
+      - receiver: slack-warnings
 
   receivers:
     - name: slack-warnings

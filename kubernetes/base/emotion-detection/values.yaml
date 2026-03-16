@@ -59,7 +59,9 @@ ingress:
   className: nginx
   host: emotion-detection.creatium.com
   annotations:
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "30m"
   tls:
     enabled: true
     secretName: emotion-detection-tls
