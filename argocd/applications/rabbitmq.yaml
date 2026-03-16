@@ -15,7 +15,7 @@ spec:
     # Bitnami RabbitMQ Helm chart
     - repoURL: https://charts.bitnami.com/bitnami
       chart: rabbitmq
-      targetRevision: 15.x
+      targetRevision: 16.x
       helm:
         valueFiles:
           - $values/kubernetes/base/rabbitmq/values.yaml
@@ -30,7 +30,7 @@ spec:
       targetRevision: main
       path: kubernetes/base/rabbitmq
       directory:
-        include: "{alerts,alertmanager-config,management-ingress,sealed-secret}.yaml"
+        include: "{alerts,alertmanager-config,management-ingress,sealed-secret,rabbitmq-app-credentials-sealed}.yaml"
 
   destination:
     server: https://kubernetes.default.svc

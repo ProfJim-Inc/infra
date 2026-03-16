@@ -32,7 +32,7 @@ spec:
       targetRevision: main
       path: kubernetes/base/voice-pipeline-bridge
       directory:
-        include: "{alerts,alertmanager-config,grafana-dashboard}.yaml"
+        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret}.yaml"
 
   destination:
     server: https://kubernetes.default.svc
