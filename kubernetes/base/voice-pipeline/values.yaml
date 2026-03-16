@@ -102,11 +102,6 @@ config:
   BATCH_SIZE: "10"
   TIMEOUT_SECONDS: "300"
   AZURE_QUEUE_NAME: "creatium-narrateaudio"
-  AZURE_BLOB_CONTAINER: "REPLACE_ME"
-  VOICE_INFO_FILE_URL: "REPLACE_ME"
-  VOICE_INFO_FILE_URL_QA: "REPLACE_ME"
-  SPEECH_MODIFIER_URL: "REPLACE_ME"
-  ERROR_LOG_URL_PREFIX: "REPLACE_ME"
 
 # Secrets must be pre-created as K8s Secrets:
 #   kubectl create secret generic voice-pipeline-secrets -n production \
@@ -127,3 +122,13 @@ secretRefs:
     key: RABBITMQ_USERNAME
   - name: rabbitmq-app-credentials
     key: RABBITMQ_PASSWORD
+  - name: voice-pipeline-secrets
+    key: AZURE_BLOB_CONTAINER
+  - name: voice-pipeline-secrets
+    key: VOICE_INFO_FILE_URL
+  - name: voice-pipeline-secrets
+    key: VOICE_INFO_FILE_URL_QA
+  - name: voice-pipeline-secrets
+    key: SPEECH_MODIFIER_URL
+  - name: voice-pipeline-secrets
+    key: ERROR_LOG_URL_PREFIX
