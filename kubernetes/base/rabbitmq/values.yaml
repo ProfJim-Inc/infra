@@ -5,7 +5,12 @@
 # Docs: https://github.com/bitnami/charts/tree/main/bitnami/rabbitmq
 # =============================================================================
 
-# -- Image: Bitnami removed images from docker.io/bitnami, use legacy registry
+# -- Bitnami removed images from docker.io/bitnami, use legacy registry
+global:
+  security:
+    allowInsecureImages: true
+
+# -- Image override
 image:
   registry: docker.io
   repository: bitnamilegacy/rabbitmq
