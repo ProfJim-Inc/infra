@@ -135,3 +135,33 @@ secretRefs:
     key: SPEECH_MODIFIER_URL
   - name: voice-pipeline-secrets
     key: ERROR_LOG_URL_PREFIX
+  - name: voice-pipeline-secrets
+    key: WEBHOOK_API_KEY
+  - name: voice-pipeline-secrets
+    key: CARTESIA_API_KEY
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_HOST
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_INDEX_NAME
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_PASSWORD
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_PORT
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_USERNAME
+  - name: voice-pipeline-secrets
+    key: DEBUG
+  - name: voice-pipeline-secrets
+    key: ENVIRONMENT
+  - name: voice-pipeline-secrets
+    key: INWORLD_API_KEY
+  - name: voice-pipeline-secrets
+    key: KOKORO_API_KEY
+  - name: voice-pipeline-secrets
+    key: KOKORO_MANAGER_URL
+  - name: voice-pipeline-secrets
+    key: LOG_FILE_PATH
+  - name: voice-pipeline-secrets
+    key: LOG_FORMAT
+  - name: voice-pipeline-secrets
+    key: LOG_GROUP_NAME
