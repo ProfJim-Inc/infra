@@ -15,7 +15,7 @@ spec:
     # Bitnami RabbitMQ Helm chart
     - repoURL: https://charts.bitnami.com/bitnami
       chart: rabbitmq
-      targetRevision: 15.x
+      targetRevision: 16.x
       helm:
         valueFiles:
           - $values/kubernetes/base/rabbitmq/values.yaml
