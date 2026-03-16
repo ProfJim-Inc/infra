@@ -4,5 +4,5 @@ helm:
     value: ghcr.io/profjim-inc/tts-microservice
     forcestring: true
   - name: image.tag
-    value: 1.0.3
+    value: 1.0.4
     forcestring: true
