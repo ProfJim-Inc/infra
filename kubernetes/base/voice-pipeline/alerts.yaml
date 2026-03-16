@@ -58,7 +58,7 @@ spec:
             (
               sum(rate(voice_pipeline_jobs_failed_total[5m]))
               /
-              sum(rate(voice_pipeline_jobs_received_total[5m]))
+              clamp_min(sum(rate(voice_pipeline_jobs_received_total[5m])), 1e-10)
             ) > 0.05
           for: 2m
           labels:
@@ -152,7 +152,7 @@ spec:
 
         - alert: VoicePipelineNoJobsProcessed
           expr: |
-            rate(voice_pipeline_jobs_received_total[2h]) == 0
+            increase(voice_pipeline_jobs_received_total[2h]) < 1
               and
             voice_pipeline_rabbitmq_connected == 1
           for: 2h

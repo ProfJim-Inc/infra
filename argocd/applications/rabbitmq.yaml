@@ -30,7 +30,7 @@ spec:
       targetRevision: main
       path: kubernetes/base/rabbitmq
       directory:
-        include: "{alerts,alertmanager-config}.yaml"
+        include: "{alerts,alertmanager-config,management-ingress}.yaml"
 
   destination:
     server: https://kubernetes.default.svc

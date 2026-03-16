@@ -41,7 +41,7 @@ nodeSelector:
 communityPlugins: ""
 extraPlugins: "rabbitmq_management rabbitmq_prometheus"
 
-# -- Management UI (internal only, no ingress)
+# -- Management UI (exposed via nip.io ingress, see management-ingress.yaml)
 service:
   type: ClusterIP
 

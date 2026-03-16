@@ -27,12 +27,12 @@ spec:
       targetRevision: main
       ref: values
 
-    # Source 3: Raw manifests (PrometheusRule alerts)
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig + Grafana dashboard)
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
       path: kubernetes/base/voice-pipeline-bridge
       directory:
-        include: "{alerts,alertmanager-config}.yaml"
+        include: "{alerts,alertmanager-config,grafana-dashboard}.yaml"
 
   destination:
     server: https://kubernetes.default.svc
