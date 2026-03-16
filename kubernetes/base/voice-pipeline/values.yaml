@@ -54,7 +54,7 @@ terminationGracePeriodSeconds: 60
 autoscaling:
   enabled: false
 
-replicaCount: 2
+replicaCount: 1
 
 # No external traffic — triggered by message queues only
 ingress:
