@@ -105,6 +105,6 @@ replicaCount: 1
 # -- Priority queue support + least-privilege permissions
 extraConfiguration: |-
   default_vhost = /
-  default_permissions.configure =
+  default_permissions.configure = .*
   default_permissions.read = .*
   default_permissions.write = .*
