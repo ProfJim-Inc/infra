@@ -56,9 +56,9 @@ spec:
         - alert: Judwaa2dHighErrorRate
           expr: |
             (
-              sum(rate(synctalk_errors_total[5m]))
+              sum(rate(synctalk_errors_total{pod=~"judwaa-2d-.*"}[5m]))
               /
-              (sum(rate(synctalk_requests_total[5m])) > 0)
+              clamp_min(sum(rate(synctalk_requests_total{pod=~"judwaa-2d-.*"}[5m])), 1e-10)
             ) > 0.10
           for: 5m
           labels:
@@ -75,7 +75,7 @@ spec:
             histogram_quantile(
               0.95,
               sum(
-                rate(synctalk_inference_duration_seconds_bucket[10m])
+                rate(synctalk_inference_duration_seconds_bucket{pod=~"judwaa-2d-.*"}[10m])
               ) by (le)
             ) > 300
           for: 10m
@@ -90,7 +90,7 @@ spec:
 
         - alert: Judwaa2dGpuMemoryHigh
           expr: |
-            synctalk_gpu_memory_used_mb > 14000
+            synctalk_gpu_memory_used_mb{pod=~"judwaa-2d-.*"} > 14000
           for: 5m
           labels:
             severity: warning
