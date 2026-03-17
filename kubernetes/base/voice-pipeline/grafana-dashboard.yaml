@@ -264,7 +264,7 @@ data:
 
         {
           "id": 19, "type": "logs", "title": "Voice Pipeline Logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0,a"y": 39 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 39 },
           "datasource": { "uid": "opensearch" },
           "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
           "targets": [{
