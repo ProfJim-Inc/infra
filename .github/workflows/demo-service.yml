@@ -116,17 +116,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # GitOps: write the new SHA tag into values.yaml so ArgoCD sees the change
-      - name: Update image tag in values.yaml
+      # GitOps: write the new SHA tag into staging values so ArgoCD deploys to staging
+      # Production deploys are handled separately via the promote-to-prod workflow
+      - name: Update staging image tag
         env:
           SHA: ${{ github.sha }}
         run: |
           SHORT_SHA="${SHA::7}"
           sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
-            kubernetes/base/demo-service/values.yaml
+            kubernetes/base/demo-service/values-stage.yaml
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add kubernetes/base/demo-service/values.yaml
-          git commit -m "chore: update demo-service image tag to ${SHORT_SHA} [skip ci]"
+          git add kubernetes/base/demo-service/values-stage.yaml
+          git commit -m "chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]"
           git push

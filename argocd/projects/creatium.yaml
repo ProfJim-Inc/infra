@@ -4,7 +4,7 @@ metadata:
   name: creatium
   namespace: argocd
 spec:
-  description: "Creatium production services"
+  description: "Creatium production and staging services"
 
   # Only allow deploying to these namespaces
   destinations:

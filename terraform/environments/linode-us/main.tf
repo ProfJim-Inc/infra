@@ -195,8 +195,9 @@ module "system_pool" {
 
   cluster_id         = module.cluster.cluster_id
   instance_type      = "g6-standard-2"    # 2 vCPU, 4 GB RAM — sufficient for ops workloads
-  autoscaler_enabled = false
-  node_count         = 2                  # 2 for HA: Prometheus + Grafana can survive node drain
+  autoscaler_enabled = true
+  min_nodes          = 2                  # always keep 2 for HA: Prometheus + Grafana survive node drain
+  max_nodes          = 3                  # scale up to 3 during peak ops load (deployments, alerting spikes)
   tags               = ["pool:system", "creatium"]
   labels             = { pool = "system" }
 }

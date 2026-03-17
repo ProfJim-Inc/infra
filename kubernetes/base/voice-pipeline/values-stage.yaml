@@ -1,29 +1,26 @@
 # =============================================================================
-# voice-pipeline — API-based TTS voice generation worker
+# voice-pipeline (STAGING) — API-based TTS voice generation worker
+# Reduced resources for staging validation, single replica
 # =============================================================================
 nameOverride: voice-pipeline
 
 image:
   repository: ghcr.io/profjim-inc/creatium-voice-pipeline
-  tag: "ab57318"   # overridden by CI/CD with Git SHA on every merge
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
   pullPolicy: Always
 
 imagePullSecrets:
   - name: ghcr-pull-secret
 
-# Health check server listens on 8080; the main process is a queue consumer
 containerPort: 8080
 
-# c6a.2xlarge equivalent: 8 vCPU / 16 GB
-# Compute pool node (g6-dedicated-8): 6 dedicated vCPU / 12 GB
-# Pod gets nearly the full node
 resources:
   requests:
-    cpu: 2000m        # 2 cores
-    memory: 2Gi       # 2 GB
+    cpu: 2000m
+    memory: 4Gi
   limits:
-    cpu: 4000m        # 4 cores (full node)
-    memory: 4Gi      # 4 GB (full node)
+    cpu: 6000m
+    memory: 12Gi
 
 probes:
   liveness:
@@ -47,17 +44,15 @@ strategy:
     maxSurge: 1
     maxUnavailable: 0
 
-# Allow in-flight TTS jobs to finish before pod is killed
 terminationGracePeriodSeconds: 60
 
 # HPA disabled — KEDA ScaledObject manages replicas based on RabbitMQ queue depth
-# See keda-scaledobject.yaml for scaling config (min 0, max 5, threshold 10 msgs/pod)
+# See keda-scaledobject-stage.yaml (min 0, max 2)
 autoscaling:
   enabled: false
 
 replicaCount: 1   # fallback when KEDA is not active
 
-# No external traffic — triggered by message queues only
 ingress:
   enabled: false
 
@@ -70,7 +65,6 @@ tolerations:
     value: "compute"
     effect: "NoSchedule"
 
-# Ensure each pod lands on a separate compute node (pod takes nearly full node)
 affinity:
   podAntiAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -86,35 +80,25 @@ commonLabels:
   team: backend
   tier: internal
   cost-center: engineering
+  environment: staging
 
 serviceMonitor:
   enabled: true
   path: /metrics
 
-# Grafana dashboard: auto-provisioned via grafana-dashboard.yaml ConfigMap
-# (deployed by ArgoCD as a raw manifest alongside alerts).
-
 config:
-  ENV: "production"
+  ENV: "staging"
   SERVICE_NAME: "voice-pipeline"
   SERVICE_VERSION: "0.1.0"
-  LOG_LEVEL: "INFO"
+  LOG_LEVEL: "DEBUG"
   OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
-  RABBITMQ_HOST: "rabbitmq.production.svc.cluster.local"
+  RABBITMQ_HOST: "rabbitmq.staging.svc.cluster.local"
   RABBITMQ_PORT: "5672"
-  MAX_WORKERS: "30"
-  BATCH_SIZE: "10"
+  MAX_WORKERS: "10"
+  BATCH_SIZE: "5"
   TIMEOUT_SECONDS: "300"
   AZURE_QUEUE_NAME: "testing-queue"
 
-# Secrets must be pre-created as K8s Secrets:
-#   kubectl create secret generic voice-pipeline-secrets -n production \
-#     --from-literal=ELEVENLABS_API_KEY=<key> \
-#     --from-literal=AZURE_CONNECTION_STRING=<conn-string> \
-#     --from-literal=AZURE_QUEUE_CONNECTION_STRING=<conn-string>
-#   kubectl create secret generic rabbitmq-app-credentials -n production \
-#     --from-literal=RABBITMQ_USERNAME=creatium \
-#     --from-literal=RABBITMQ_PASSWORD=<password>
 secretRefs:
   - name: voice-pipeline-secrets
     key: ELEVENLABS_API_KEY

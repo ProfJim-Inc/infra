@@ -1,0 +1,5 @@
+# Copy this file to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars to Git — it contains secrets
+
+linode_api_token       = "your-linode-api-token-here"
+allowed_kube_api_cidrs = ["YOUR_OFFICE_IP/32"]

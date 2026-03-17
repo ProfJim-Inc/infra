@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-backend-stage
+  namespace: argocd
+  labels:
+    team: backend
+    tier: customer-facing
+    environment: staging
+  # No Image Updater annotations — staging uses CI-driven SHA writeback
+spec:
+  project: creatium
+
+  source:
+    repoURL: https://github.com/ProfJim-Inc/infra.git
+    targetRevision: main
+    path: kubernetes/charts/creatium-service
+    helm:
+      valueFiles:
+        - ../../../kubernetes/base/agent-backend/values-stage.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
