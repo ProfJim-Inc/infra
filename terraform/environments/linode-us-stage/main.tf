@@ -76,7 +76,7 @@ module "general_pool" {
   instance_type      = "g6-standard-4"
   autoscaler_enabled = true
   min_nodes          = 1                  # staging: 1 is fine, no HA requirement
-  max_nodes          = 4
+  max_nodes          = 2
   tags               = ["pool:general", "creatium", "staging"]
   labels             = { pool = "general" }
 }
