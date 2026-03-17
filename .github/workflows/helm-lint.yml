@@ -38,3 +38,8 @@ jobs:
         run: |
           helm lint kubernetes/charts/creatium-service/ \
             -f kubernetes/base/demo-service/values.yaml
+
+      - name: Lint with emotion-detection values
+        run: |
+          helm lint kubernetes/charts/creatium-service/ \
+            -f kubernetes/base/emotion-detection/values.yaml
