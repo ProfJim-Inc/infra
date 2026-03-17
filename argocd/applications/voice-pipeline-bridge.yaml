@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: voice-pipeline-bridge
+  namespace: argocd
+  labels:
+    team: backend
+    tier: internal
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    # Image tag is updated by CI workflow (same commit as voice-pipeline)
+    # No Image Updater here — avoids race conditions with two writers
+spec:
+  project: creatium
+
+  sources:
+    # Source 1: The shared Helm chart
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/voice-pipeline-bridge/values.yaml
+
+    # Source 2: The per-service values file
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig + Grafana dashboard)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/voice-pipeline-bridge
+      directory:
+        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

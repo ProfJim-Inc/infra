@@ -28,6 +28,8 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: cert-manager
       server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
 
   # Only allow deploying from our infra repo and approved Helm charts
   sourceRepos:
@@ -41,7 +43,9 @@ spec:
     - "https://nvidia.github.io/k8s-device-plugin"
     - "https://grafana.github.io/helm-charts"
     - "https://open-telemetry.github.io/opentelemetry-helm-charts"
+    - "https://charts.bitnami.com/bitnami"
     - "https://charts.jetstack.io"
+    - "https://argoproj.github.io/argo-helm"
 
   # Allow these Kubernetes resource types
   clusterResourceWhitelist:

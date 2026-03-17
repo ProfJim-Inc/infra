@@ -1,0 +1,164 @@
+# =============================================================================
+# tts-microservice PrometheusRules
+#
+# Alert rules tailored for a GPU-backed TTS inference service:
+#   TtsMicroserviceDown            → critical → Slack #alerts-critical (+ #alerts)
+#   TtsMicroservicePodCrashLooping → warning  → Slack #alerts
+#   TtsMicroserviceHighErrorRate   → warning  → Slack #alerts
+#   TtsMicroserviceHighLatencyP99  → warning  → Slack #alerts
+#   TtsMicroserviceGpuOom          → critical → Slack #alerts-critical (+ #alerts)
+#   TtsMicroserviceAdmissionSpike  → warning  → Slack #alerts
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tts-microservice
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: tts-microservice
+spec:
+  groups:
+    - name: tts-microservice.availability
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # No running pods — single-replica GPU service, this is full outage
+        # -------------------------------------------------------------------
+        - alert: TtsMicroserviceDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"tts-microservice.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: tts-microservice
+            namespace: production
+          annotations:
+            summary: "tts-microservice has no running pods"
+            description: >-
+              All tts-microservice replicas are unavailable for > 1 minute.
+              This is a full TTS outage — agent-backend cannot synthesize audio.
+            runbook: "kubectl describe pod -l app=tts-microservice -n production && kubectl get events -n production --sort-by=.lastTimestamp | tail -20"
+
+        # -------------------------------------------------------------------
+        # Pod crash-looping — GPU pods are slow to restart, catch early
+        # -------------------------------------------------------------------
+        - alert: TtsMicroservicePodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"tts-microservice-.*"
+              }[15m]
+            ) > 2
+          for: 0m
+          labels:
+            severity: warning
+            service: tts-microservice
+            namespace: production
+          annotations:
+            summary: "tts-microservice pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times
+              in the last 15 minutes. GPU model loading takes ~15-30s per restart.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+        # -------------------------------------------------------------------
+        # OOM kill — GPU memory exhaustion
+        # -------------------------------------------------------------------
+        - alert: TtsMicroserviceGpuOom
+          expr: |
+            max by (pod) (
+              max_over_time(
+                kube_pod_container_status_last_terminated_reason{
+                  namespace="production",
+                  pod=~"tts-microservice-.*",
+                  reason="OOMKilled"
+                }[30m]
+              )
+            ) > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: tts-microservice
+            namespace: production
+          annotations:
+            summary: "tts-microservice pod OOM killed"
+            description: >-
+              Pod {{ $labels.pod }} was OOM killed. Check memory limits
+              and concurrent connection count (KOKORO_MAX_CONNECTIONS).
+            runbook: "kubectl describe pod {{ $labels.pod }} -n production"
+
+    - name: tts-microservice.slos
+      interval: 30s
+      rules:
+
+        # -------------------------------------------------------------------
+        # Error rate > 5% over 5 minutes
+        # -------------------------------------------------------------------
+        - alert: TtsMicroserviceHighErrorRate
+          expr: |
+            (
+              sum(rate(kokoro_errors_total{namespace="production"}[5m]))
+              /
+              sum(rate(kokoro_requests_total{namespace="production"}[5m]))
+            ) > 0.05
+            and
+            sum(rate(kokoro_requests_total{namespace="production"}[5m])) > 0
+          for: 2m
+          labels:
+            severity: warning
+            service: tts-microservice
+            namespace: production
+          annotations:
+            summary: "tts-microservice error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of TTS synthesis requests are
+              failing over the last 5 minutes.
+
+        # -------------------------------------------------------------------
+        # P99 request duration > 10s (TTS inference is slower than HTTP APIs)
+        # -------------------------------------------------------------------
+        - alert: TtsMicroserviceHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(kokoro_request_duration_seconds_bucket{namespace="production"}[5m])
+              ) by (le, endpoint)
+            ) > 10.0
+          for: 5m
+          labels:
+            severity: warning
+            service: tts-microservice
+            namespace: production
+          annotations:
+            summary: "tts-microservice P99 latency above 10 seconds"
+            description: >-
+              P99 latency for endpoint {{ $labels.endpoint }} is
+              {{ $value | humanizeDuration }} over the last 5 minutes.
+
+        # -------------------------------------------------------------------
+        # Admission rejections spike — service is overloaded
+        # -------------------------------------------------------------------
+        - alert: TtsMicroserviceAdmissionSpike
+          expr: |
+            sum(rate(kokoro_admission_rejections_total{namespace="production"}[5m])) > 0.1
+          for: 3m
+          labels:
+            severity: warning
+            service: tts-microservice
+            namespace: production
+          annotations:
+            summary: "tts-microservice rejecting requests (429s)"
+            description: >-
+              More than 6 admission rejections per minute sustained for 3 minutes.
+              The GPU inference queue is saturated. Consider reducing
+              KOKORO_MAX_CONNECTIONS or investigating slow inference.

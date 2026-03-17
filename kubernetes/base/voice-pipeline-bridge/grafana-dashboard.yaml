@@ -1,0 +1,132 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voice-pipeline-bridge-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  voice-pipeline-bridge.json: |
+    {
+      "title": "Voice Pipeline Bridge",
+      "uid": "voice-pipeline-bridge",
+      "tags": ["voice-pipeline-bridge", "azure-queue", "rabbitmq", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Status", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "stat", "title": "Bridge Pods",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 1 },
+                { "color": "green", "value": 2 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=~\"voice-pipeline-bridge.*\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        {
+          "id": 2, "type": "stat", "title": "RabbitMQ Connected",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "DISCONNECTED", "color": "red" }, "1": { "text": "CONNECTED", "color": "green" } } }
+              ]
+            }
+          },
+          "targets": [{
+            "expr": "min(voice_pipeline_rabbitmq_connected)",
+            "legendFormat": "status"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "Pod Restarts (15m window)",
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"production\", pod=~\"voice-pipeline-bridge-.*\"}[15m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 4, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 4, "w": 6, "x": 16, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"voice-pipeline-bridge-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        { "type": "row", "title": "Message Flow", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }, "collapsed": false },
+
+        {
+          "id": 5, "type": "timeseries", "title": "Message Retry Rate",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 6 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [{
+            "expr": "rate(voice_pipeline_messages_retried_total[5m])",
+            "legendFormat": "retries/s"
+          }]
+        },
+
+        {
+          "id": 6, "type": "timeseries", "title": "Dead-Lettered Messages (15m window)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 6 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "dead-lettered" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "increase(voice_pipeline_messages_dead_lettered_total[15m])",
+            "legendFormat": "dead-lettered"
+          }]
+        },
+
+        {
+          "id": 7, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 6 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"voice-pipeline-bridge-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }, "collapsed": false },
+
+        {
+          "id": 8, "type": "logs", "title": "Bridge Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:voice-pipeline-bridge*",
+            "queryType": "lucene",
+            "timeField": "@timestamp"
+          }]
+        }
+      ]
+    }
