@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-valkey
+  namespace: production
+  labels:
+    app.kubernetes.io/name: prowler-valkey
+    app.kubernetes.io/part-of: prowler
+    app.kubernetes.io/component: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prowler-valkey
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prowler-valkey
+        app.kubernetes.io/part-of: prowler
+        app.kubernetes.io/component: cache
+    spec:
+      nodeSelector:
+        pool: system
+      containers:
+        - name: valkey
+          image: valkey/valkey:7-alpine3.19
+          ports:
+            - containerPort: 6379
+              name: valkey
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - valkey-cli ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - valkey-cli ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

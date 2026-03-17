@@ -55,6 +55,7 @@ ingress:
   host: sentinel.creatium.com
   path: /
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
   tls:
     enabled: true
@@ -71,5 +72,11 @@ commonLabels:
 serviceMonitor:
   enabled: false
 
+## NOTE: VITE_API_BASE_URL is baked into the JS bundle at Docker build time
+## via the CI build-arg, NOT read from this ConfigMap at runtime.
+## This entry is kept for documentation only.
 config:
   VITE_API_BASE_URL: "https://sentinel-api.creatium.com/api/v1"
+
+## NOTE: Prowler runs as a separate docker-compose stack, not through this
+## helm chart. Prowler secrets are managed via its own .env file.

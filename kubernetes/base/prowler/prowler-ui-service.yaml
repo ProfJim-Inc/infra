@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: prowler-ui
+  namespace: production
+  labels:
+    app.kubernetes.io/name: prowler-ui
+    app.kubernetes.io/part-of: prowler
+    app.kubernetes.io/component: ui
+spec:
+  type: NodePort
+  ports:
+    - port: 3000
+      targetPort: http
+      protocol: TCP
+      name: http
+      nodePort: 30030
+  selector:
+    app.kubernetes.io/name: prowler-ui
