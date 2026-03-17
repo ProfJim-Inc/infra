@@ -1,0 +1,53 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: avatar-addition-ui
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: avatar-addition-ui
+spec:
+  groups:
+    - name: avatar-addition-ui.availability
+      interval: 30s
+      rules:
+
+        - alert: AvatarAdditionUiDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"avatar-addition-ui.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: avatar-addition-ui
+            namespace: production
+          annotations:
+            summary: "avatar-addition-ui has no running pods"
+            description: >-
+              All avatar-addition-ui replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/avatar-addition-ui -n production"
+
+        - alert: AvatarAdditionUiPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"avatar-addition-ui-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: avatar-addition-ui
+            namespace: production
+          annotations:
+            summary: "avatar-addition-ui pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} (container: {{ $labels.container }}) has
+              restarted {{ $value | printf "%.0f" }} times in the last 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"

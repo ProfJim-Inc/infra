@@ -1,0 +1,117 @@
+# =============================================================================
+# avatar-addition — Avatar deployment orchestration API
+# =============================================================================
+nameOverride: avatar-addition
+
+image:
+  repository: ghcr.io/profjim-inc/avatar-addition
+  tag: "latest"   # overridden by ArgoCD Image Updater with semver tag
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 5000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 30
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilization: 70
+
+# Internal only — frontend UI handles external access
+ingress:
+  enabled: false
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: backend
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+# Non-sensitive config — injected as environment variables via ConfigMap
+config:
+  ENV: "production"
+  SERVICE_NAME: "avatar-addition"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  CONTAINER_NAME: "animationassets"
+  BLOB_CONTAINER: "judwaafolders"
+  AVATAR_CONFIG_CONTAINER: "fastavatar"
+  RABBITMQ_HOST: "18.215.128.25"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: "profjim_admin"
+  HEARTBEAT: "5"
+  RETRY_DELAY: "1"
+  JUDWAA_EXCHANGE: "synctalk2D_exchange"
+  JUDWAA_QUEUE: "synctalk2D_video_generation"
+  JUDWAA_ROUTING_KEY: "synctalk2D_key"
+  JUDWAA_ALTERNATE_EXCHANGE: "synctalk2D_alternate"
+  JUDWAA_ALTERNATE_QUEUE: "synctalk2D_alt_queue"
+  JUDWAA_DL_EXCHANGE: "synctalk2D_dead_letter"
+  JUDWAA_DL_QUEUE: "synctalk2D_dl_queue"
+  JUDWAA_API_URL: "https://judwaa-qa.azurewebsites.net/internal/videos"
+  TERMINATION_URL: "https://judwaa-qa.azurewebsites.net/internal/gpu/terminate"
+  MAX_RETRIES: "5"
+  TERMINATION_BUFFER: "5"
+  TARGET_W: "1024"
+  TARGET_H: "1024"
+  AUDIO_BASE_PATH: "audios/"
+  RESULT_BASE_PATH: "results/"
+  AZURE_RESOURCE_GROUP: "bhavish_rg_1169"
+  AZURE_APP_NAME: "judwaa-qa"
+
+# Sensitive config — injected from K8s Secrets
+secretRefs:
+  - name: avatar-addition-secrets
+    key: CONNECTION_STRING
+  - name: avatar-addition-secrets
+    key: AZURE_SUBSCRIPTION_ID
+  - name: avatar-addition-secrets
+    key: AZURE_CONFIG_URL
+  - name: avatar-addition-secrets
+    key: RABBITMQ_PASSWORD
+  - name: avatar-addition-secrets
+    key: JUDWAA_AUTH_TOKEN
+  - name: avatar-addition-secrets
+    key: DEPLOY_AUTH_TOKEN
+  - name: avatar-addition-secrets
+    key: WHITELISTED_INSTANCES
