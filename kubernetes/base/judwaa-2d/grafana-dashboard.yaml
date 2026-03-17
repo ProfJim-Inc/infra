@@ -1,0 +1,320 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: judwaa-2d-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  judwaa-2d.json: |
+    {
+      "title": "Judwaa 2D — GPU Lip-Sync Inference",
+      "uid": "judwaa-2d",
+      "tags": ["judwaa-2d", "synctalk", "gpu", "inference", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Inference Request Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [{
+            "expr": "sum(rate(synctalk_requests_total{pod=~\"judwaa-2d-.*\"}[5m]))",
+            "legendFormat": "req/s"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Error Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "error rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(synctalk_errors_total[5m])) / clamp_min(sum(rate(synctalk_requests_total[5m])), 1e-10)",
+            "legendFormat": "error rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "E2E Inference Duration (p50/p95/p99)",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(synctalk_inference_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(synctalk_inference_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(synctalk_inference_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Running Pods",
+          "gridPos": { "h": 6, "w": 3, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "green", "value": 1 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"judwaa-2d\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        {
+          "id": 5, "type": "stat", "title": "Active Inferences",
+          "gridPos": { "h": 6, "w": 3, "x": 21, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 3 },
+                { "color": "red", "value": 5 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(synctalk_active_inferences)",
+            "legendFormat": "active"
+          }]
+        },
+
+        { "type": "row", "title": "GPU & Resources", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 6, "type": "timeseries", "title": "GPU Memory Used",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "decmbytes" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "GPU VRAM" },
+              "properties": [{ "id": "thresholds", "value": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 12000 },
+                { "color": "red", "value": 14000 }
+              ]}}] }]
+          },
+          "targets": [{
+            "expr": "synctalk_gpu_memory_used_mb",
+            "legendFormat": "GPU VRAM"
+          }]
+        },
+
+        {
+          "id": 7, "type": "timeseries", "title": "GPU Utilization",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } },
+          "targets": [{
+            "expr": "synctalk_gpu_utilization_percent",
+            "legendFormat": "GPU %"
+          }]
+        },
+
+        {
+          "id": 8, "type": "timeseries", "title": "CPU Memory (RSS)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "decmbytes" } },
+          "targets": [{
+            "expr": "synctalk_cpu_memory_used_mb",
+            "legendFormat": "RSS"
+          }]
+        },
+
+        { "type": "row", "title": "Pipeline Stages", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 9, "type": "timeseries", "title": "Audio Processing Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 6, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(synctalk_audio_processing_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(synctalk_audio_processing_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Video Generation Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 6, "x": 6, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(synctalk_video_generation_duration_seconds_bucket[5m])) by (le, avatar))", "legendFormat": "p50 {{ avatar }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(synctalk_video_generation_duration_seconds_bucket[5m])) by (le, avatar))", "legendFormat": "p95 {{ avatar }}" }
+          ]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "Post-Processing Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 6, "x": 12, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(synctalk_post_processing_duration_seconds_bucket[5m])) by (le, step))", "legendFormat": "p50 {{ step }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(synctalk_post_processing_duration_seconds_bucket[5m])) by (le, step))", "legendFormat": "p95 {{ step }}" }
+          ]
+        },
+
+        {
+          "id": 12, "type": "timeseries", "title": "Blob Upload Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 6, "x": 18, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(synctalk_blob_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(synctalk_blob_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        { "type": "row", "title": "RabbitMQ & Throughput", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "collapsed": false },
+
+        {
+          "id": 13, "type": "stat", "title": "Queue Depth",
+          "gridPos": { "h": 7, "w": 4, "x": 0, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 5 },
+                { "color": "red", "value": 20 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "synctalk_queue_depth",
+            "legendFormat": "depth"
+          }]
+        },
+
+        {
+          "id": 14, "type": "timeseries", "title": "Messages Consumed / Rejected",
+          "gridPos": { "h": 7, "w": 10, "x": 4, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(synctalk_rabbitmq_messages_consumed_total[5m])", "legendFormat": "consumed/s" },
+            { "expr": "sum(rate(synctalk_rabbitmq_messages_rejected_total[5m])) by (reason)", "legendFormat": "rejected/s ({{ reason }})" }
+          ]
+        },
+
+        {
+          "id": 15, "type": "piechart", "title": "Request Outcomes (1h)",
+          "gridPos": { "h": 7, "w": 5, "x": 14, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "sum(increase(synctalk_requests_total[1h])) by (status)",
+            "legendFormat": "{{ status }}"
+          }]
+        },
+
+        {
+          "id": 16, "type": "piechart", "title": "Errors by Type (1h)",
+          "gridPos": { "h": 7, "w": 5, "x": 19, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "sum(increase(synctalk_errors_total[1h])) by (error_type)",
+            "legendFormat": "{{ error_type }}"
+          }]
+        },
+
+        { "type": "row", "title": "Operational Counters", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }, "collapsed": false },
+
+        {
+          "id": 17, "type": "timeseries", "title": "Audio Downloads",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(synctalk_audio_downloads_total{status=\"success\"}[5m])", "legendFormat": "success/s" },
+            { "expr": "rate(synctalk_audio_downloads_total{status=\"failed\"}[5m])", "legendFormat": "failed/s" }
+          ]
+        },
+
+        {
+          "id": 18, "type": "timeseries", "title": "Blob Uploads",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(synctalk_blob_uploads_total{status=\"success\"}[5m])", "legendFormat": "success/s" },
+            { "expr": "rate(synctalk_blob_uploads_total{status=\"failed\"}[5m])", "legendFormat": "failed/s" }
+          ]
+        },
+
+        {
+          "id": 19, "type": "timeseries", "title": "Status Updates to Judwaa API",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(synctalk_status_updates_total{status=\"success\"}[5m])", "legendFormat": "success/s" },
+            { "expr": "rate(synctalk_status_updates_total{status=\"failed\"}[5m])", "legendFormat": "failed/s" }
+          ]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 }, "collapsed": false },
+
+        {
+          "id": 20, "type": "timeseries", "title": "Container CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"judwaa-2d-.*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 21, "type": "timeseries", "title": "Container Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"judwaa-2d-.*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 22, "type": "timeseries", "title": "GPU Batch Inference Latency (p50/p95)",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(synctalk_frame_batch_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(synctalk_frame_batch_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 }, "collapsed": false },
+
+        {
+          "id": 23, "type": "logs", "title": "Judwaa 2D Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 46 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:judwaa-2d*",
+            "queryType": "lucene",
+            "timeField": "@timestamp"
+          }]
+        }
+      ]
+    }

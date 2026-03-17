@@ -1,0 +1,144 @@
+# =============================================================================
+# judwaa-2d — GPU-accelerated 2D avatar lip-sync inference (queue consumer)
+# Consumes RabbitMQ messages, runs SyncTalk U-Net inference, uploads to Azure Blob
+# =============================================================================
+nameOverride: judwaa-2d
+
+image:
+  repository: ghcr.io/profjim-inc/synctalk-deployment
+  tag: "latest"   # overridden by ArgoCD Image Updater (semver)
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# Metrics server port — the app has no HTTP API, only a Prometheus /metrics endpoint on 9090
+containerPort: 9090
+
+resources:
+  requests:
+    cpu: 2000m
+    memory: 8Gi
+    nvidia.com/gpu: "1"
+  limits:
+    cpu: 4000m
+    memory: 16Gi
+    nvidia.com/gpu: "1"
+
+# Exec probes — judwaa-2d is a queue consumer with no HTTP routes.
+# Liveness: check the Python process is alive.
+# Readiness: disabled (no traffic routing — it's a worker, not a service).
+probes:
+  liveness:
+    enabled: false
+  readiness:
+    enabled: false
+
+# GPU pods must use Recreate — RollingUpdate would require 2 GPUs simultaneously.
+strategy:
+  type: Recreate
+
+# Allow in-flight inference to finish before pod is killed.
+# A single inference can take 1–5 minutes depending on audio length.
+terminationGracePeriodSeconds: 600
+
+# GPU nodes are expensive — no autoscaling, fixed 1 replica
+autoscaling:
+  enabled: false
+
+replicaCount: 1
+
+# No ingress — internal queue consumer, not an API
+ingress:
+  enabled: false
+
+# GPU node pool — tainted with nvidia.com/gpu=present:NoSchedule
+nodeSelector:
+  pool: gpu
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: workload-type
+    operator: Equal
+    value: gpu
+    effect: NoSchedule
+
+commonLabels:
+  team: backend
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+config:
+  ENV: "production"
+  SERVICE_NAME: "judwaa-2d"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  RABBITMQ_PORT: "5672"
+  HEARTBEAT: "5"
+  RETRY_DELAY: "1"
+  JUDWAA_EXCHANGE: "synctalk2D_exchange"
+  JUDWAA_QUEUE: "synctalk2D_video_generation"
+  JUDWAA_ROUTING_KEY: "synctalk2D_key"
+  JUDWAA_ALTERNATE_EXCHANGE: "synctalk2D_alternate"
+  JUDWAA_ALTERNATE_QUEUE: "synctalk2D_alt_queue"
+  JUDWAA_DL_EXCHANGE: "synctalk2D_dead_letter"
+  JUDWAA_DL_QUEUE: "synctalk2D_dl_queue"
+  MAX_RETRIES: "5"
+  TERMINATION_BUFFER: "5"
+  TARGET_W: "1024"
+  TARGET_H: "1024"
+  AUDIO_BASE_PATH: "audios/"
+  RESULT_BASE_PATH: "results/"
+  CONTAINER_NAME: "animationassets"
+  OPENSEARCH_INDEX: "synctalk-logs"
+  PROMETHEUS_JOB_NAME: "synctalk_inference"
+
+# Secrets must be pre-created as K8s Secrets:
+#   kubectl create secret generic judwaa-2d-secrets -n production \
+#     --from-literal=CONNECTION_STRING=<azure-storage-conn-string> \
+#     --from-literal=RABBITMQ_HOST=<host> \
+#     --from-literal=RABBITMQ_USER=<user> \
+#     --from-literal=RABBITMQ_PASSWORD=<password> \
+#     --from-literal=JUDWAA_AUTH_TOKEN=<token> \
+#     --from-literal=JUDWAA_API_URL=<url> \
+#     --from-literal=TERMINATION_URL=<url> \
+#     --from-literal=STORAGE_ACCOUNT_NAME=<name> \
+#     --from-literal=AZURE_CONFIG_URL=<url> \
+#     --from-literal=OPENSEARCH_ENDPOINT=<url> \
+#     --from-literal=OPENSEARCH_USERNAME=<user> \
+#     --from-literal=OPENSEARCH_PASSWORD=<password> \
+#     --from-literal=WHITELISTED_INSTANCES=<comma-separated-ids>
+secretRefs:
+  - name: judwaa-2d-secrets
+    key: CONNECTION_STRING
+  - name: judwaa-2d-secrets
+    key: RABBITMQ_HOST
+  - name: judwaa-2d-secrets
+    key: RABBITMQ_USER
+  - name: judwaa-2d-secrets
+    key: RABBITMQ_PASSWORD
+  - name: judwaa-2d-secrets
+    key: JUDWAA_AUTH_TOKEN
+  - name: judwaa-2d-secrets
+    key: JUDWAA_API_URL
+  - name: judwaa-2d-secrets
+    key: TERMINATION_URL
+  - name: judwaa-2d-secrets
+    key: STORAGE_ACCOUNT_NAME
+  - name: judwaa-2d-secrets
+    key: AZURE_CONFIG_URL
+  - name: judwaa-2d-secrets
+    key: AVATAR_CONFIG_CONTAINER
+  - name: judwaa-2d-secrets
+    key: OPENSEARCH_ENDPOINT
+  - name: judwaa-2d-secrets
+    key: OPENSEARCH_USERNAME
+  - name: judwaa-2d-secrets
+    key: OPENSEARCH_PASSWORD
+  - name: judwaa-2d-secrets
+    key: WHITELISTED_INSTANCES
