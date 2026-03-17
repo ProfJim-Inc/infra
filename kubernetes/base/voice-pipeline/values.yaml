@@ -19,11 +19,11 @@ containerPort: 8080
 # Pod gets nearly the full node
 resources:
   requests:
-    cpu: 4000m        # 4 cores
-    memory: 8Gi       # 8 GB
+    cpu: 2000m        # 2 cores
+    memory: 2Gi       # 2 GB
   limits:
-    cpu: 6000m        # 6 cores (full node)
-    memory: 12Gi      # 12 GB (full node)
+    cpu: 4000m        # 4 cores (full node)
+    memory: 4Gi      # 4 GB (full node)
 
 probes:
   liveness:
