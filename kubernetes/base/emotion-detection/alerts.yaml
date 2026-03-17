@@ -6,6 +6,7 @@
 #   EmotionDetectionPodCrashLooping -> warning  -> Slack #alerts
 #   EmotionDetectionOom             -> critical -> Slack #alerts-critical (+ #alerts)
 #   EmotionDetectionHighLatencyP99  -> warning  -> Slack #alerts
+#   EmotionDetectionHighErrorRate   -> warning  -> Slack #alerts
 # =============================================================================
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -78,7 +79,7 @@ spec:
             runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
 
         # -------------------------------------------------------------------
-        # OOM kill — memory limit (1Gi) exceeded
+        # OOM kill — memory limit (2Gi) exceeded
         # -------------------------------------------------------------------
         - alert: EmotionDetectionOom
           expr: |
@@ -132,3 +133,25 @@ spec:
               {{ $value | humanizeDuration }} over the last 5 minutes.
               Normal P95 under load is ~24ms. Check for CPU throttling or
               excessive concurrent requests.
+
+        # -------------------------------------------------------------------
+        # HTTP error rate > 5% over 5 minutes
+        # -------------------------------------------------------------------
+        - alert: EmotionDetectionHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", pod=~"emotion-detection-.*", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", pod=~"emotion-detection-.*"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: emotion-detection
+            namespace: production
+          annotations:
+            summary: "emotion-detection HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx over the last 5 minutes.
+              Check for model errors, malformed input spikes, or resource exhaustion.
+            runbook: "kubectl logs -l app=emotion-detection -n production --tail=100 | grep -i error"
