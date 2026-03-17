@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: avatar-addition
+  namespace: argocd
+  labels:
+    team: backend
+    tier: internal
+  annotations:
+    # ── ArgoCD Image Updater ────────────────────────────────────────────────
+    # Watches ghcr.io/profjim-inc/avatar-addition for new semver tags.
+    # When a newer tag is found, writes it back to the values file in git.
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/avatar-addition
+    argocd-image-updater.argoproj.io/app.update-strategy: semver
+    argocd-image-updater.argoproj.io/app.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/app.pull-secret: pullsecret:argocd/ghcr-pull-secret
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/git-branch: main
+spec:
+  project: creatium
+
+  sources:
+    # Source 1: The shared Helm chart + per-service values
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/avatar-addition/values.yaml
+
+    # Source 2: Per-service values file (referenced as $values above)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig + SealedSecret)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/avatar-addition
+      directory:
+        include: "{alerts,alertmanager-config,sealed-secret,grafana-dashboard}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
