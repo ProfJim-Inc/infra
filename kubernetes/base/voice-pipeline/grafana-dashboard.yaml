@@ -260,11 +260,79 @@ data:
           ]
         },
 
-        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 }, "collapsed": false },
+        { "type": "row", "title": "ElevenLabs Pipeline Breakdown", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 }, "collapsed": false },
+
+        {
+          "id": 20, "type": "timeseries", "title": "Voice Lookup Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_voice_lookup_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_voice_lookup_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 21, "type": "timeseries", "title": "ElevenLabs HTTP Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_elevenlabs_http_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_elevenlabs_http_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 22, "type": "timeseries", "title": "Audio Save Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_audio_save_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_audio_save_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 23, "type": "timeseries", "title": "Timing Conversion Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_timing_conversion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_timing_conversion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 24, "type": "timeseries", "title": "Generated Audio Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_audio_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_audio_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 25, "type": "timeseries", "title": "Word Alignment Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_word_alignment_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_word_alignment_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 }, "collapsed": false },
 
         {
           "id": 19, "type": "logs", "title": "Voice Pipeline Logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 39 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 54 },
           "datasource": { "uid": "opensearch" },
           "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
           "targets": [{
