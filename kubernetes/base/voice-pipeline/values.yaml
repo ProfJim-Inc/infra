@@ -5,7 +5,7 @@ nameOverride: voice-pipeline
 
 image:
   repository: ghcr.io/profjim-inc/creatium-voice-pipeline
-  tag: "349ab3e"   # overridden by CI/CD with Git SHA on every merge
+  tag: "ab57318"   # overridden by CI/CD with Git SHA on every merge
   pullPolicy: Always
 
 imagePullSecrets:
