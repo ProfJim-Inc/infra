@@ -18,7 +18,7 @@ spec:
             sum(
               kube_deployment_status_replicas_available{
                 namespace="production",
-                deployment=~"avatar-addition.*"
+                deployment="avatar-addition"
               }
             ) == 0
           for: 1m
@@ -37,7 +37,7 @@ spec:
             increase(
               kube_pod_container_status_restarts_total{
                 namespace="production",
-                pod=~"avatar-addition-.*"
+                pod=~"avatar-addition-(?!ui).*"
               }[15m]
             ) > 3
           for: 0m

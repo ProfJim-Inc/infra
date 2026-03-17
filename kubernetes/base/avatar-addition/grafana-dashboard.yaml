@@ -69,7 +69,7 @@ data:
             }
           },
           "targets": [{
-            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=~\"avatar-addition.*\"})",
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"avatar-addition\"})",
             "legendFormat": "pods"
           }]
         },
@@ -159,7 +159,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short" } },
           "targets": [{
-            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"avatar-addition-[^u].*\", container!=\"\"}[2m])) by (pod)",
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"avatar-addition-(?!ui).*\", container!=\"\"}[2m])) by (pod)",
             "legendFormat": "{{ pod }}"
           }]
         },
@@ -170,7 +170,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "bytes" } },
           "targets": [{
-            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"avatar-addition-[^u].*\", container!=\"\"}) by (pod)",
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"avatar-addition-(?!ui).*\", container!=\"\"}) by (pod)",
             "legendFormat": "{{ pod }}"
           }]
         },
@@ -181,7 +181,7 @@ data:
           "datasource": { "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short" } },
           "targets": [{
-            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"production\", pod=~\"avatar-addition-[^u].*\"}[1h])",
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"production\", pod=~\"avatar-addition-(?!ui).*\"}[1h])",
             "legendFormat": "{{ pod }}"
           }]
         },
@@ -194,7 +194,7 @@ data:
           "datasource": { "uid": "opensearch" },
           "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
           "targets": [{
-            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:avatar-addition*",
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:avatar-addition* AND NOT kubernetes.pod_name:avatar-addition-ui*",
             "queryType": "lucene",
             "timeField": "@timestamp",
             "metrics": [{ "type": "logs", "id": "1" }]
