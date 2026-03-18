@@ -33,7 +33,7 @@ metadata:
 spec:
   scaleTargetRef:
     name: voice-pipeline               # must match the Deployment name
-  minReplicaCount: 0                    # scale to zero when queue is empty
+  minReplicaCount: 1                    # always keep at least 1 pod running
   maxReplicaCount: 5                    # cap — each pod takes ~1 compute node
   pollingInterval: 15                   # check queue depth every 15s
   cooldownPeriod: 300                   # wait 5 min after last trigger before scaling down
