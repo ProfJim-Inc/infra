@@ -84,9 +84,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0        # full history so pull --rebase works
-          ref: main              # checkout the branch, not the detached commit SHA
+          # GITHUB_TOKEN cannot push to branch-protected main.
+          # Use a PAT (INFRA_PUSH_TOKEN) with repo write + bypass branch protection.
+          # Fallback to GITHUB_TOKEN if PAT is not set.
+          token: ${{ secrets.INFRA_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: main
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -118,41 +121,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # GitOps: write the new SHA tag into staging values so ArgoCD deploys to staging
-      # Production deploys are handled separately via the promote-to-prod workflow
+      # GitOps: update staging image tag via GitHub API (atomic, no race conditions)
+      # Uses the REST API instead of git push to avoid conflicts with Image Updater
+      # and other workflows that also commit to main
       - name: Update staging image tag
         env:
+          GH_TOKEN: ${{ secrets.INFRA_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}
         run: |
           SHORT_SHA="${SHA::7}"
+          FILE_PATH="kubernetes/base/demo-service/values-stage.yaml"
+          REPO="${GITHUB_REPOSITORY}"
 
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Get current file content and SHA from the API
+          RESPONSE=$(gh api "repos/${REPO}/contents/${FILE_PATH}" --jq '{sha: .sha, content: .content}')
+          FILE_SHA=$(echo "$RESPONSE" | jq -r '.sha')
+          CURRENT_CONTENT=$(echo "$RESPONSE" | jq -r '.content' | base64 -d)
 
-          # Retry loop to handle concurrent pushes (Image Updater, other workflows)
-          # Uses || true to prevent set -e from aborting on failed push
-          for i in 1 2 3; do
-            echo "=== Attempt $i ==="
-            git fetch origin main
-            git reset --hard origin/main
+          # Replace the tag in the content
+          NEW_CONTENT=$(echo "$CURRENT_CONTENT" | sed "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|")
 
-            sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
-              kubernetes/base/demo-service/values-stage.yaml
+          # Check if anything actually changed
+          if [ "$CURRENT_CONTENT" = "$NEW_CONTENT" ]; then
+            echo "Tag already set to ${SHORT_SHA}, nothing to update"
+            exit 0
+          fi
 
-            git add kubernetes/base/demo-service/values-stage.yaml
-            if git diff --cached --quiet; then
-              echo "No changes to commit"
-              exit 0
-            fi
-            git commit -m "chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]"
+          # Push update via API (atomic — handles concurrent writes)
+          NEW_CONTENT_B64=$(echo "$NEW_CONTENT" | base64 -w 0)
+          gh api "repos/${REPO}/contents/${FILE_PATH}" \
+            --method PUT \
+            --field message="chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]" \
+            --field content="${NEW_CONTENT_B64}" \
+            --field sha="${FILE_SHA}" \
+            --field branch="main"
 
-            if git push origin main; then
-              echo "Push succeeded"
-              exit 0
-            fi
-            echo "Push failed (attempt $i), retrying..."
-            sleep 5
-          done
-
-          echo "Failed to push after 3 attempts"
-          exit 1
+          echo "Updated ${FILE_PATH} with tag: ${SHORT_SHA}"
