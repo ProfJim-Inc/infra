@@ -1,5 +1,5 @@
 # =============================================================================
-# PersistentVolumeClaim — binds to the existing Linode Block Storage PV
+# PersistentVolumeClaim — CSI-provisioned Linode Block Storage volume
 # =============================================================================
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -9,8 +9,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: linode-block-storage-retain
   resources:
     requests:
       storage: 500Gi
-  volumeName: judwaa-nfs-storage
-  storageClassName: ""
