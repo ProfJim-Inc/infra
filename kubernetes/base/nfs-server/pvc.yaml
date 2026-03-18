@@ -9,7 +9,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: linode-block-storage-retain
+  storageClassName: linode-block-storage-encrypted-retain
   resources:
     requests:
       storage: 500Gi
