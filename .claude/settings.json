@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Read(//Users/viditbhatia/equiphon_framework/**)",
-      "Read(//Users/viditbhatia/Development/creatium/git/equiphon_framework/**)"
+      "Read(//Users/viditbhatia/Development/creatium/git/equiphon_framework/**)",
+      "WebFetch(domain:argo-cd.readthedocs.io)",
+      "WebFetch(domain:codefresh.io)",
+      "WebFetch(domain:akuity.io)",
+      "WebFetch(domain:argocd-image-updater.readthedocs.io)",
+      "WebFetch(domain:www.cncf.io)",
+      "WebFetch(domain:blog.argoproj.io)",
+      "WebFetch(domain:opengitops.dev)",
+      "WebFetch(domain:developers.redhat.com)",
+      "WebFetch(domain:www.weave.works)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:docs.github.com)"
     ],
     "additionalDirectories": [
       "/Users/viditbhatia/Development/creatium/git/infra/.claude/skills/sre-k8s",
