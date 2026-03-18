@@ -1,0 +1,61 @@
+# =============================================================================
+# agent-backend (STAGING) — Python/FastAPI service
+# Reduced resources, single replica min, SHA-based deploys
+# =============================================================================
+nameOverride: agent-backend
+
+image:
+  repository: ghcr.io/creatium/agent-backend
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.stage.creatium.com
+  path: /
+  tls:
+    enabled: true
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: backend
+  tier: customer-facing
+  cost-center: engineering
+  environment: staging
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+config:
+  ENV: "staging"
+  LOG_LEVEL: "DEBUG"

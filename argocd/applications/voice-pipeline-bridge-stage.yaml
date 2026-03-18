@@ -1,41 +1,36 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: voice-pipeline
+  name: voice-pipeline-bridge-stage
   namespace: argocd
   labels:
     team: backend
     tier: internal
+    environment: staging
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
-    # Image tag is updated by CI workflow in the voice-pipeline repo
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: creatium
 
   sources:
-    # Source 1: The shared Helm chart
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
       path: kubernetes/charts/creatium-service
       helm:
         valueFiles:
-          - $values/kubernetes/base/voice-pipeline/values.yaml
-
-    # Source 2: The per-service values file (referenced as $values above)
+          - $values/kubernetes/base/voice-pipeline-bridge/values-stage.yaml
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
       ref: values
-
-    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig + Grafana dashboard)
     - repoURL: https://github.com/ProfJim-Inc/infra.git
       targetRevision: main
-      path: kubernetes/base/voice-pipeline
+      path: kubernetes/base/voice-pipeline-bridge
       directory:
-        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret,keda-scaledobject}.yaml"
+        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret}.yaml"
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: production
+    namespace: staging
 
   syncPolicy:
     automated:

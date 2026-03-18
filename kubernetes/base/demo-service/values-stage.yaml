@@ -1,0 +1,85 @@
+# =============================================================================
+# demo-service (STAGING) — Infrastructure showcase (FastAPI)
+# Reduced resources, single replica min, SHA-based deploys
+# =============================================================================
+nameOverride: demo-service
+
+image:
+  repository: ghcr.io/profjim-inc/demo-service
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /readiness
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 15
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  host: demo.stage.creatium.com
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+  tls:
+    enabled: true
+    secretName: demo-stage-tls
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: platform
+  tier: internal
+  cost-center: engineering
+  environment: staging
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+config:
+  ENV: "staging"
+  SERVICE_NAME: "demo-service"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "DEBUG"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  POOL: "general"
+
+secretRefs: []
