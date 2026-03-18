@@ -130,19 +130,28 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Retry loop to handle concurrent pushes (Image Updater, other workflows)
+          # Uses || true to prevent set -e from aborting on failed push
           for i in 1 2 3; do
-            git pull --rebase origin main
+            echo "=== Attempt $i ==="
+            git fetch origin main
+            git reset --hard origin/main
 
             sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
               kubernetes/base/demo-service/values-stage.yaml
 
             git add kubernetes/base/demo-service/values-stage.yaml
-            git diff --cached --quiet && echo "No changes to commit" && exit 0
+            if git diff --cached --quiet; then
+              echo "No changes to commit"
+              exit 0
+            fi
             git commit -m "chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]"
 
-            git push && exit 0
+            if git push origin main; then
+              echo "Push succeeded"
+              exit 0
+            fi
             echo "Push failed (attempt $i), retrying..."
-            git reset HEAD~1
+            sleep 5
           done
 
           echo "Failed to push after 3 attempts"
