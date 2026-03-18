@@ -64,6 +64,9 @@ tolerations:
     value: gpu
     effect: NoSchedule
 
+podLabels:
+  nfs-client: judwaa
+
 commonLabels:
   team: backend
   tier: internal
@@ -113,6 +116,22 @@ config:
 #     --from-literal=OPENSEARCH_USERNAME=<user> \
 #     --from-literal=OPENSEARCH_PASSWORD=<password> \
 #     --from-literal=WHITELISTED_INSTANCES=<comma-separated-ids>
+volumes:
+  - name: nfs-models
+    nfs:
+      server: "10.128.22.96"
+      path: "/"
+
+volumeMounts:
+  - name: nfs-models
+    mountPath: /app/data
+    subPath: models/data
+    readOnly: true
+  - name: nfs-models
+    mountPath: /app/model
+    subPath: models/model
+    readOnly: true
+
 secretRefs:
   - name: judwaa-2d-secrets
     key: CONNECTION_STRING
