@@ -14,7 +14,7 @@ spec:
     targetRevision: main
     path: kubernetes/base/nfs-server
     directory:
-      include: "{pv,pvc,deployment,service,networkpolicy,sealed-secret}.yaml"
+      include: "{pv,pvc,deployment,service,networkpolicy,sealed-secret,pdb,alerts,alertmanager-config}.yaml"
 
   destination:
     server: https://kubernetes.default.svc

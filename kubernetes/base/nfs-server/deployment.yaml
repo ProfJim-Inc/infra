@@ -35,6 +35,16 @@ spec:
           env:
             - name: SHARED_DIRECTORY
               value: /export
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - showmount -e localhost | grep -q /export
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           securityContext:
             privileged: true
           volumeMounts:
