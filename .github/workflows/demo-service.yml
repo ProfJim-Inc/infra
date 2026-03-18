@@ -123,11 +123,25 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           SHORT_SHA="${SHA::7}"
-          sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
-            kubernetes/base/demo-service/values-stage.yaml
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add kubernetes/base/demo-service/values-stage.yaml
-          git commit -m "chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]"
-          git push
+
+          # Retry loop to handle concurrent pushes (Image Updater, other workflows)
+          for i in 1 2 3; do
+            git pull --rebase origin main
+
+            sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
+              kubernetes/base/demo-service/values-stage.yaml
+
+            git add kubernetes/base/demo-service/values-stage.yaml
+            git diff --cached --quiet && echo "No changes to commit" && exit 0
+            git commit -m "chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]"
+
+            git push && exit 0
+            echo "Push failed (attempt $i), retrying..."
+            git reset HEAD~1
+          done
+
+          echo "Failed to push after 3 attempts"
+          exit 1
