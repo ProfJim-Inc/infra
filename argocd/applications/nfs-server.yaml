@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nfs-server
+  namespace: argocd
+  labels:
+    team: infra
+    tier: internal
+spec:
+  project: creatium
+
+  source:
+    repoURL: https://github.com/ProfJim-Inc/infra.git
+    targetRevision: main
+    path: kubernetes/base/nfs-server
+    directory:
+      include: "{pv,pvc,deployment,service,networkpolicy,sealed-secret}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  # Manual sync only — NFS server restarts cause all NFS mounts to hang.
+  # Only sync this app deliberately via ArgoCD UI or CLI.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground

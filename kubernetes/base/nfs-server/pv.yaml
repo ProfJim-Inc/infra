@@ -1,0 +1,22 @@
+# =============================================================================
+# PersistentVolume — references the existing Linode Block Storage volume
+#
+# This does NOT create a new volume — it imports the existing
+# judwaa-nfs-storage (500 GB) volume by its Linode volume ID.
+# The CSI driver attaches it to whatever node the NFS server pod runs on.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: judwaa-nfs-storage
+spec:
+  capacity:
+    storage: 500Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  csi:
+    driver: linodebs.csi.linode.com
+    volumeHandle: "14035891"
+    fsType: ext4

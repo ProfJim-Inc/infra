@@ -1,0 +1,53 @@
+# =============================================================================
+# NFS Server — exports the Linode Block Storage volume over NFS v4
+#
+# Runs a lightweight NFS server inside the cluster. The Block Storage PVC
+# (RWO) is mounted here, and other pods mount via NFS (effectively RWX).
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: production
+  labels:
+    app: nfs-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      nodeSelector:
+        pool: general
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine:12
+          ports:
+            - name: nfs
+              containerPort: 2049
+              protocol: TCP
+          env:
+            - name: SHARED_DIRECTORY
+              value: /export
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: nfs-data
+              mountPath: /export
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: nfs-data
+          persistentVolumeClaim:
+            claimName: judwaa-nfs-storage
