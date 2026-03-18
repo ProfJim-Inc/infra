@@ -5,7 +5,7 @@ nameOverride: sentinel-backend
 
 image:
   repository: ghcr.io/profjim-inc/sentinel-backend
-  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+  tag: "a69d9de"   # overridden by CI/CD with Git SHA on every merge
 
 imagePullSecrets:
   - name: ghcr-pull-secret
