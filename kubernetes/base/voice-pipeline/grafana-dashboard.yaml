@@ -328,11 +328,43 @@ data:
           ]
         },
 
-        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 }, "collapsed": false },
+        {
+          "id": 26, "type": "timeseries", "title": "Voices Cache Hit/Miss Rate",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 53 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(voice_pipeline_voices_cache_total{result=\"hit\"}[5m])", "legendFormat": "hits/s" },
+            { "expr": "rate(voice_pipeline_voices_cache_total{result=\"miss\"}[5m])", "legendFormat": "misses/s" },
+            { "expr": "rate(voice_pipeline_voices_cache_total{result=\"stale\"}[5m])", "legendFormat": "stale/s" }
+          ]
+        },
+
+        {
+          "id": 27, "type": "stat", "title": "Voices Cache Age",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 53 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1800}, {"color": "red", "value": 3600}] } } },
+          "targets": [
+            { "expr": "voice_pipeline_voices_cache_age_seconds", "legendFormat": "cache age" }
+          ]
+        },
+
+        {
+          "id": 28, "type": "stat", "title": "Voices Cached",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 53 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}] } } },
+          "targets": [
+            { "expr": "voice_pipeline_voices_cache_size", "legendFormat": "voices" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 }, "collapsed": false },
 
         {
           "id": 19, "type": "logs", "title": "Voice Pipeline Logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 54 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 61 },
           "datasource": { "uid": "opensearch" },
           "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
           "targets": [{
