@@ -18,5 +18,5 @@ spec:
   storageClassName: ""
   csi:
     driver: linodebs.csi.linode.com
-    volumeHandle: "14035891"
+    volumeHandle: "14035891-judwaa-nfs-storage"
     fsType: ext4
