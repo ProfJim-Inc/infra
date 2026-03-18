@@ -57,7 +57,7 @@ spec:
     - type: rabbitmq
       metadata:
         protocol: amqp
-        queueName: testing-queue        # matches AZURE_QUEUE_NAME in config
+        queueName: creatium-narrateaudio        # matches AZURE_QUEUE_NAME in config
         mode: QueueLength
         value: "10"                     # scale up when >10 messages per pod
       authenticationRef:
