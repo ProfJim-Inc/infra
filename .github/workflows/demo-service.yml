@@ -84,9 +84,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0        # full history so pull --rebase works
-          ref: main              # checkout the branch, not the detached commit SHA
+          # GITHUB_TOKEN cannot push to branch-protected main.
+          # Use a PAT (INFRA_PUSH_TOKEN) with repo write + bypass branch protection.
+          # Fallback to GITHUB_TOKEN if PAT is not set.
+          token: ${{ secrets.INFRA_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: main
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
