@@ -31,3 +31,5 @@ Thumbs.db
 # Helm
 *.tgz
 
+# Temp working files
+tmp/

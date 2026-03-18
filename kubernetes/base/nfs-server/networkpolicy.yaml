@@ -1,0 +1,23 @@
+# =============================================================================
+# NetworkPolicy — restrict NFS access to only judwaa-2d pods and
+# model-transfer jobs
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nfs-server
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: nfs-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              nfs-client: judwaa
+      ports:
+        - protocol: TCP
+          port: 2049

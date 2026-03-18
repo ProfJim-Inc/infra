@@ -1,0 +1,19 @@
+# =============================================================================
+# NFS Server Service — ClusterIP only, no external access
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: production
+  labels:
+    app: nfs-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: nfs
+      port: 2049
+      targetPort: 2049
+      protocol: TCP
+  selector:
+    app: nfs-server

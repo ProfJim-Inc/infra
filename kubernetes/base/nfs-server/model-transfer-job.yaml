@@ -1,0 +1,82 @@
+# =============================================================================
+# Model Transfer Job — downloads avatar models from Azure Blob to NFS
+#
+# Usage:
+#   kubectl create -f kubernetes/base/nfs-server/model-transfer-job.yaml
+#
+# The Job mounts the NFS volume, runs the transfer script (from ConfigMap),
+# downloads new/updated avatars from Azure Blob, then exits.
+#
+# To re-run: delete the old Job first, then create a new one:
+#   kubectl delete job model-transfer -n production
+#   kubectl create -f kubernetes/base/nfs-server/model-transfer-job.yaml
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-transfer
+  namespace: production
+  labels:
+    app: model-transfer
+    nfs-client: judwaa
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: model-transfer
+        nfs-client: judwaa
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        pool: general
+      containers:
+        - name: transfer
+          image: mcr.microsoft.com/azure-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "Installing azcopy v10.27.1..."
+              cd /tmp
+              curl -sL https://azcopyvnext.azureedge.net/releases/release-10.27.1-20241113/azcopy_linux_amd64_10.27.1.tar.gz | tar --strip-components=1 -xz
+              mv azcopy /usr/local/bin/
+              chmod +x /usr/local/bin/azcopy
+              azcopy --version
+              echo "Running transfer script..."
+              cd /scripts
+              chmod +x transfer_models_to_nfs.sh
+              ./transfer_models_to_nfs.sh 2>&1 | tee /mnt/judwaa-nfs-storage/models/transfer.log
+          env:
+            - name: AZURE_STORAGE_ACCOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: azure-model-transfer
+                  key: AZURE_STORAGE_ACCOUNT
+            - name: AZURE_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: azure-model-transfer
+                  key: AZURE_ACCOUNT_KEY
+          volumeMounts:
+            - name: nfs-models
+              mountPath: /mnt/judwaa-nfs-storage/models
+            - name: transfer-scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 1Gi
+      volumes:
+        - name: nfs-models
+          nfs:
+            server: nfs-server.production.svc.cluster.local
+            path: /export/models
+        - name: transfer-scripts
+          configMap:
+            name: model-transfer-scripts

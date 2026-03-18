@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: nfs-server
+  namespace: production
+  labels:
+    app.kubernetes.io/name: nfs-server
+spec:
+  route:
+    receiver: slack-critical
+    groupBy:
+      - alertname
+      - service
+    groupWait: 0s
+    groupInterval: 5m
+    repeatInterval: 1h
+    matchers:
+      - name: service
+        value: nfs-server
+
+  receivers:
+    - name: slack-critical
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: webhook_url
+          channel: "#alerts-critical"
+          sendResolved: true
+          iconEmoji: ":rotating_light:"
+          title: |
+            :rotating_light: [{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *Summary:* {{ .Annotations.summary }}
+            *Description:* {{ .Annotations.description }}
+            *Service:* `{{ .Labels.service }}`
+            {{ if .Annotations.runbook }}*Runbook:* {{ .Annotations.runbook }}{{ end }}
+            {{ end }}
