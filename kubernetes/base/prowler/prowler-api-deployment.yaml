@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-api
+  namespace: production
+  labels:
+    app.kubernetes.io/name: prowler-api
+    app.kubernetes.io/part-of: prowler
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prowler-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prowler-api
+        app.kubernetes.io/part-of: prowler
+        app.kubernetes.io/component: api
+    spec:
+      nodeSelector:
+        pool: general
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: migrate
+          image: prowlercloud/prowler-api:stable
+          command:
+            - /home/prowler/docker-entrypoint.sh
+            - "prod"
+          envFrom:
+            - secretRef:
+                name: prowler-secrets
+          env:
+            - name: DJANGO_MIGRATE_ONLY
+              value: "true"
+      containers:
+        - name: prowler-api
+          image: prowlercloud/prowler-api:stable
+          command:
+            - /home/prowler/docker-entrypoint.sh
+            - "prod"
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - secretRef:
+                name: prowler-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /api/v1/
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: output
+              mountPath: /tmp/prowler_api_output
+      volumes:
+        - name: output
+          emptyDir: {}

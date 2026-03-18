@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sentinel-backend
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: app=ghcr.io/profjim-inc/sentinel-backend
+    argocd-image-updater.argoproj.io/app.update-strategy: semver
+    argocd-image-updater.argoproj.io/app.helm.image-name: image.repository
+    argocd-image-updater.argoproj.io/app.helm.image-tag: image.tag
+    argocd-image-updater.argoproj.io/write-back-method: git
+spec:
+  project: creatium
+
+  sources:
+    # Source 1: The shared Helm chart
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/sentinel-backend/values.yaml
+
+    # Source 2: The per-service values file (referenced as $values above)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    # Source 3: Raw manifests (PrometheusRule + AlertmanagerConfig)
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/sentinel-backend
+      directory:
+        include: "{alerts,alertmanager-config,grafana-dashboard,sealed-secret}.yaml"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

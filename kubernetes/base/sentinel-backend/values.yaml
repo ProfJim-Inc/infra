@@ -1,0 +1,150 @@
+# =============================================================================
+# sentinel-backend — Cloud cost tracking API (Python/FastAPI + APScheduler)
+# =============================================================================
+nameOverride: sentinel-backend
+
+image:
+  repository: ghcr.io/profjim-inc/sentinel-backend
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+containerPort: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /readiness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 5
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 30
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: sentinel-api.creatium.com
+  path: /
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: sentinel-backend-tls
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: platform
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+config:
+  ENV: "production"
+  SERVICE_NAME: "sentinel-backend"
+  SERVICE_VERSION: "1.0.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  MONGODB_DB_NAME: "sentinel_backend"
+  COST_REFRESH_INTERVAL_MINUTES: "60"
+  ENABLED_PROVIDERS: "AWS,Azure,RunPod,Cerebrium,GCP,Anthropic,OpenAI,Deepgram,LiveKit,ElevenLabs"
+  DAYS_TO_TRACK: "30"
+  AWS_REGION: "us-east-1"
+  AWS_SES_REGION: "us-east-1"
+  BACKEND_CORS_ORIGINS: "https://sentinel.creatium.com"
+
+secretRefs:
+  # MongoDB
+  - name: sentinel-backend-secrets
+    key: MONGODB_URI
+  # JWT signing
+  - name: sentinel-backend-secrets
+    key: SECRET_KEY
+  # AWS (Cost Explorer)
+  - name: sentinel-backend-secrets
+    key: AWS_ACCESS_KEY_ID
+  - name: sentinel-backend-secrets
+    key: AWS_SECRET_ACCESS_KEY
+  # AWS SES
+  - name: sentinel-backend-secrets
+    key: AWS_SES_ACCESS_KEY_ID
+  - name: sentinel-backend-secrets
+    key: AWS_SES_SECRET_ACCESS_KEY
+  - name: sentinel-backend-secrets
+    key: SES_FROM_EMAIL
+  # Azure
+  - name: sentinel-backend-secrets
+    key: AZURE_SUBSCRIPTION_ID
+  - name: sentinel-backend-secrets
+    key: AZURE_TENANT_ID
+  - name: sentinel-backend-secrets
+    key: AZURE_CLIENT_ID
+  - name: sentinel-backend-secrets
+    key: AZURE_CLIENT_SECRET
+  # GCP
+  - name: sentinel-backend-secrets
+    key: GCP_PROJECT_ID
+  - name: sentinel-backend-secrets
+    key: GCP_BILLING_DATASET
+  - name: sentinel-backend-secrets
+    key: GCP_BILLING_TABLE
+  # AI/ML API keys
+  - name: sentinel-backend-secrets
+    key: ANTHROPIC_ADMIN_API_KEY
+  - name: sentinel-backend-secrets
+    key: OPENAI_API_KEY
+  - name: sentinel-backend-secrets
+    key: OPENAI_ORGANIZATION_ID
+  - name: sentinel-backend-secrets
+    key: DEEPGRAM_API_KEY
+  - name: sentinel-backend-secrets
+    key: DEEPGRAM_PROJECT_ID
+  # GPU/Compute providers
+  - name: sentinel-backend-secrets
+    key: RUNPOD_API_KEY
+  - name: sentinel-backend-secrets
+    key: CEREBRIUM_API_KEY
+  - name: sentinel-backend-secrets
+    key: ELEVENLABS_API_KEY
+  # LiveKit
+  - name: sentinel-backend-secrets
+    key: LIVEKIT_API_KEY
+  - name: sentinel-backend-secrets
+    key: LIVEKIT_API_SECRET
+  - name: sentinel-backend-secrets
+    key: LIVEKIT_CLOUD_ENDPOINT

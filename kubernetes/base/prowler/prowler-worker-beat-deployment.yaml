@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-worker-beat
+  namespace: production
+  labels:
+    app.kubernetes.io/name: prowler-worker-beat
+    app.kubernetes.io/part-of: prowler
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prowler-worker-beat
+  # Recreate strategy — only one beat instance must run at a time
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prowler-worker-beat
+        app.kubernetes.io/part-of: prowler
+        app.kubernetes.io/component: scheduler
+    spec:
+      nodeSelector:
+        pool: general
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: prowler-worker-beat
+          image: prowlercloud/prowler-api:stable
+          command:
+            - /home/prowler/docker-entrypoint.sh
+            - "beat"
+          envFrom:
+            - secretRef:
+                name: prowler-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
