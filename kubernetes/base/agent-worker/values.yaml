@@ -1,0 +1,128 @@
+# =============================================================================
+# agent-worker — Judwaa AI: Celery avatar pipeline worker (avatar_pipeline queue)
+#
+# NOTE — Storage blocker: this worker writes intermediate files (audio segments,
+# video segments) to local disk during processing. Until the shared-storage
+# blocker is resolved (see Phase 5 code changes), this worker will not function
+# correctly with multiple replicas.
+#
+# Short-term fix: replicaCount=1 + emptyDir volume (requires Helm chart update
+# to support extraVolumes/extraVolumeMounts — see Phase 5).
+# =============================================================================
+nameOverride: agent-worker
+
+image:
+  repository: ghcr.io/creatium/agent-backend   # Same image as agent-backend
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# Override CMD to run Celery worker instead of uvicorn
+command:
+  - celery
+args:
+  - -A
+  - backend.tasks.celery_app
+  - worker
+  - --queues=avatar_pipeline
+  - --concurrency=1
+  - --loglevel=info
+
+containerPort: 8000   # unused but required by chart schema
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 3Gi
+
+# Workers have no HTTP server — disable HTTP probes.
+# TODO: extend the Helm chart with exec probe support for celery inspect ping.
+probes:
+  liveness:
+    enabled: false
+  readiness:
+    enabled: false
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Long-running jobs — allow up to 5 minutes for graceful Celery shutdown
+terminationGracePeriodSeconds: 300
+
+# Fixed replicas — avatar pipeline jobs are long-running (~20 min).
+# Use KEDA ScaledObject with RabbitMQ queue depth for production autoscaling.
+autoscaling:
+  enabled: false
+
+replicaCount: 1
+
+ingress:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: backend
+  tier: internal
+  cost-center: engineering
+
+config:
+  ENV: "production"
+  SERVICE_NAME: "agent-worker"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq.production.svc.cluster.local:5672/"
+  AZURE_STORAGE_CONTAINER_NAME: "judwaa-automation"
+  CREATIFY_MODEL_VERSION: "aurora_v1"
+  ENABLE_AI_IMAGE_GENERATION: "true"
+  IMAGE_GEN_PROVIDER: "nano_banana_portkey"
+  IMAGE_GEN_MODEL: "@vertexai/gemini-3-pro-image-preview"
+  IMAGE_GEN_GATHER_TIMEOUT: "90"
+  SEND_USER_EMAIL: "true"
+  CEREBRIUM_BG_REMOVAL_TIMEOUT: "300"
+  AWS_SES_REGION: "us-east-1"
+  SES_FROM_EMAIL: "donotreply@judwaa.com"
+  AUDIO_CONCURRENCY: "3"
+  AUDIO_MAX_RETRIES: "4"
+  AUDIO_TIMEOUT_READ: "120"
+
+secretRefs:
+  # Shares the same K8s Secret as agent-backend (same credentials, same image)
+  - name: agent-backend-secrets
+    key: DATABASE_URL
+  - name: agent-backend-secrets
+    key: ELEVENLABS_API_KEY
+  - name: agent-backend-secrets
+    key: CREATIFY_API_ID
+  - name: agent-backend-secrets
+    key: CREATIFY_API_KEY
+  - name: agent-backend-secrets
+    key: CREATIFY_WEBHOOK_SECRET
+  - name: agent-backend-secrets
+    key: CEREBRIUM_API_URL
+  - name: agent-backend-secrets
+    key: CEREBRIUM_AUTH_TOKEN
+  - name: agent-backend-secrets
+    key: CEREBRIUM_WEBHOOK_SECRET
+  - name: agent-backend-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: agent-backend-secrets
+    key: PORTKEY_API_KEY
+  - name: agent-backend-secrets
+    key: AWS_SES_ACCESS_KEY_ID
+  - name: agent-backend-secrets
+    key: AWS_SES_SECRET_ACCESS_KEY
+  - name: agent-backend-secrets
+    key: BACKEND_PUBLIC_URL

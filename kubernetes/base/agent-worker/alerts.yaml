@@ -1,0 +1,86 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agent-worker
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: agent-worker
+spec:
+  groups:
+    - name: agent-worker.availability
+      interval: 30s
+      rules:
+        - alert: AgentWorkerDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"agent-worker$"
+              }
+            ) == 0
+          for: 2m
+          labels:
+            severity: critical
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "agent-worker (avatar pipeline) has no running pods"
+            description: >-
+              All agent-worker replicas are unavailable for > 2 minutes. Avatar job processing is halted.
+            runbook: "kubectl rollout status deployment/agent-worker -n production"
+
+        - alert: AgentWorkerPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"agent-worker-[^b].*"
+              }[15m]
+            ) > 2
+          for: 0m
+          labels:
+            severity: warning
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "agent-worker pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: agent-worker.business
+      interval: 60s
+      rules:
+        - alert: AgentAvatarPipelineStuck
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(agent_pipeline_duration_seconds_bucket[1h])) by (le)
+            ) > 3600
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "agent-worker P95 pipeline duration exceeds 60 minutes"
+            description: >-
+              95th percentile avatar pipeline job duration is {{ $value | humanizeDuration }}.
+              Jobs may be stuck — check Creatify/Cerebrium API status.
+            runbook: "kubectl logs -l app=agent-worker -n production --tail=200"
+
+        - alert: AgentAvatarPipelineFailureSpike
+          expr: |
+            increase(agent_avatar_jobs_failed_total[15m]) >= 3
+          for: 0m
+          labels:
+            severity: critical
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "3+ avatar pipeline failures in 15 minutes (phase: {{ $labels.phase }})"
+            description: >-
+              {{ $value | printf "%.0f" }} jobs failed in the last 15 minutes during the {{ $labels.phase }} phase.
+            runbook: "kubectl logs -l app=agent-worker -n production --tail=200"

@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agent-worker-bg
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: agent-worker-bg
+spec:
+  groups:
+    - name: agent-worker-bg.availability
+      interval: 30s
+      rules:
+        - alert: AgentWorkerBgDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"agent-worker-bg.*"
+              }
+            ) == 0
+          for: 2m
+          labels:
+            severity: critical
+            service: agent-worker-bg
+            namespace: production
+          annotations:
+            summary: "agent-worker-bg (background removal) has no running pods"
+            description: >-
+              All agent-worker-bg replicas are unavailable. Video background removal is halted.
+            runbook: "kubectl rollout status deployment/agent-worker-bg -n production"
+
+        - alert: AgentWorkerBgPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"agent-worker-bg-.*"
+              }[15m]
+            ) > 2
+          for: 0m
+          labels:
+            severity: warning
+            service: agent-worker-bg
+            namespace: production
+          annotations:
+            summary: "agent-worker-bg pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"

@@ -1,9 +1,14 @@
-# agent-backend — Python/FastAPI service
+# =============================================================================
+# agent-backend — Judwaa AI Avatar Pipeline: FastAPI API server
+# =============================================================================
 nameOverride: agent-backend
 
 image:
   repository: ghcr.io/creatium/agent-backend
-  tag: "latest"
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
 
 containerPort: 8000
 
@@ -20,10 +25,24 @@ probes:
     enabled: true
     path: /health
     initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
   readiness:
     enabled: true
     path: /ready
     initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 15
 
 autoscaling:
   enabled: true
@@ -39,6 +58,7 @@ ingress:
   path: /
   tls:
     enabled: true
+    secretName: agent-backend-tls
 
 nodeSelector:
   pool: general
@@ -49,9 +69,81 @@ commonLabels:
   cost-center: engineering
 
 serviceMonitor:
-  enabled: true
+  enabled: true   # /metrics returns Prometheus text once instrumented
   path: /metrics
 
 config:
-  LOG_LEVEL: "info"
-  # Add more non-sensitive config here
+  ENV: "production"
+  SERVICE_NAME: "agent-backend"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  CORS_ALLOWED_ORIGINS: "https://app.creatium.com"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq.production.svc.cluster.local:5672/"
+  AZURE_STORAGE_CONTAINER_NAME: "judwaa-automation"
+  CREATIFY_MODEL_VERSION: "aurora_v1"
+  ENABLE_AI_IMAGE_GENERATION: "true"
+  IMAGE_GEN_PROVIDER: "nano_banana_portkey"
+  IMAGE_GEN_MODEL: "@vertexai/gemini-3-pro-image-preview"
+  IMAGE_GEN_GATHER_TIMEOUT: "90"
+  IMAGE_GEN_MAX_CONCURRENT: "5"
+  ENABLE_VOICE_DESIGNER: "true"
+  VOICE_DESIGN_RATE_LIMIT_RPM: "3"
+  SEND_USER_EMAIL: "true"
+  CEREBRIUM_BG_REMOVAL_TIMEOUT: "300"
+  AWS_SES_REGION: "us-east-1"
+  SES_FROM_EMAIL: "donotreply@judwaa.com"
+
+secretRefs:
+  # kubectl create secret generic agent-backend-secrets -n production \
+  #   --from-literal=DATABASE_URL=postgresql://user:pass@host:5432/aurora \
+  #   --from-literal=ELEVENLABS_API_KEY=... \
+  #   --from-literal=ELEVENLABS_VOICE_DESIGN_API_KEY=... \
+  #   --from-literal=CREATIFY_API_ID=... \
+  #   --from-literal=CREATIFY_API_KEY=... \
+  #   --from-literal=CREATIFY_WEBHOOK_SECRET=... \
+  #   --from-literal=CEREBRIUM_API_URL=... \
+  #   --from-literal=CEREBRIUM_AUTH_TOKEN="Bearer ..." \
+  #   --from-literal=CEREBRIUM_BG_REMOVAL_API_KEY=... \
+  #   --from-literal=CEREBRIUM_WEBHOOK_SECRET=... \
+  #   --from-literal=AZURE_STORAGE_CONNECTION_STRING=... \
+  #   --from-literal=PORTKEY_API_KEY=... \
+  #   --from-literal=REMOVEBG_API_KEY=... \
+  #   --from-literal=VOICE_DESIGN_TOKEN_SECRET=... \
+  #   --from-literal=AWS_SES_ACCESS_KEY_ID=... \
+  #   --from-literal=AWS_SES_SECRET_ACCESS_KEY=... \
+  #   --from-literal=BACKEND_PUBLIC_URL=https://api.creatium.com
+  - name: agent-backend-secrets
+    key: DATABASE_URL
+  - name: agent-backend-secrets
+    key: ELEVENLABS_API_KEY
+  - name: agent-backend-secrets
+    key: ELEVENLABS_VOICE_DESIGN_API_KEY
+  - name: agent-backend-secrets
+    key: CREATIFY_API_ID
+  - name: agent-backend-secrets
+    key: CREATIFY_API_KEY
+  - name: agent-backend-secrets
+    key: CREATIFY_WEBHOOK_SECRET
+  - name: agent-backend-secrets
+    key: CEREBRIUM_API_URL
+  - name: agent-backend-secrets
+    key: CEREBRIUM_AUTH_TOKEN
+  - name: agent-backend-secrets
+    key: CEREBRIUM_BG_REMOVAL_API_KEY
+  - name: agent-backend-secrets
+    key: CEREBRIUM_WEBHOOK_SECRET
+  - name: agent-backend-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: agent-backend-secrets
+    key: PORTKEY_API_KEY
+  - name: agent-backend-secrets
+    key: REMOVEBG_API_KEY
+  - name: agent-backend-secrets
+    key: VOICE_DESIGN_TOKEN_SECRET
+  - name: agent-backend-secrets
+    key: AWS_SES_ACCESS_KEY_ID
+  - name: agent-backend-secrets
+    key: AWS_SES_SECRET_ACCESS_KEY
+  - name: agent-backend-secrets
+    key: BACKEND_PUBLIC_URL

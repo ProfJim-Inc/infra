@@ -1,0 +1,89 @@
+# =============================================================================
+# agent-worker-bg — Judwaa AI: Celery worker for video background removal
+# =============================================================================
+nameOverride: agent-worker-bg
+
+image:
+  repository: ghcr.io/creatium/agent-backend   # Same image as agent-backend
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# Override CMD to consume only the bg_removal queue
+command:
+  - celery
+args:
+  - -A
+  - backend.tasks.celery_app
+  - worker
+  - --queues=bg_removal
+  - --loglevel=info
+
+containerPort: 8000   # unused but required by chart schema
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+# Workers have no HTTP server — disable HTTP probes.
+probes:
+  liveness:
+    enabled: false
+  readiness:
+    enabled: false
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# BG removal calls out to Cerebrium (up to 300s timeout) — allow graceful drain
+terminationGracePeriodSeconds: 360
+
+autoscaling:
+  enabled: false
+
+replicaCount: 1
+
+ingress:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+
+nodeSelector:
+  pool: general
+
+commonLabels:
+  team: backend
+  tier: internal
+  cost-center: engineering
+
+config:
+  ENV: "production"
+  SERVICE_NAME: "agent-worker-bg"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq.production.svc.cluster.local:5672/"
+  AZURE_STORAGE_CONTAINER_NAME: "judwaa-automation"
+  CEREBRIUM_BG_REMOVAL_TIMEOUT: "300"
+  AWS_SES_REGION: "us-east-1"
+  SES_FROM_EMAIL: "donotreply@judwaa.com"
+
+secretRefs:
+  - name: agent-backend-secrets
+    key: DATABASE_URL
+  - name: agent-backend-secrets
+    key: CEREBRIUM_BG_REMOVAL_API_KEY
+  - name: agent-backend-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: agent-backend-secrets
+    key: AWS_SES_ACCESS_KEY_ID
+  - name: agent-backend-secrets
+    key: AWS_SES_SECRET_ACCESS_KEY
