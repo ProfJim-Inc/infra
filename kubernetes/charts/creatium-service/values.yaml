@@ -23,6 +23,11 @@ image:
 imagePullSecrets: []
   # - name: ghcr-pull-secret
 
+# -- Override the container command (default: use Dockerfile CMD)
+command: []
+# -- Override the container args (default: use Dockerfile CMD args)
+args: []
+
 # -- Container port the application listens on
 containerPort: 3000
 
@@ -136,6 +141,24 @@ strategy:
 
 # -- Grace period before SIGKILL after SIGTERM. Increase for long-running jobs (e.g. GPU inference).
 terminationGracePeriodSeconds: 30
+
+# -- Extra labels added to the pod template (not the Deployment itself)
+podLabels: {}
+  # nfs-client: judwaa
+
+# -- Additional volumes to attach to the pod
+volumes: []
+  # - name: nfs-models
+  #   nfs:
+  #     server: nfs-server.production.svc.cluster.local
+  #     path: /export
+
+# -- Additional volume mounts for the container
+volumeMounts: []
+  # - name: nfs-models
+  #   mountPath: /app/data
+  #   subPath: models/data
+  #   readOnly: true
 
 # -- Service account
 serviceAccount:

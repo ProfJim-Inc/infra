@@ -1,0 +1,110 @@
+# =============================================================================
+# RabbitMQ — Shared message broker for all Creatium services
+# =============================================================================
+# Bitnami RabbitMQ Helm chart
+# Docs: https://github.com/bitnami/charts/tree/main/bitnami/rabbitmq
+# =============================================================================
+
+# -- Bitnami removed images from docker.io/bitnami, use legacy registry
+global:
+  security:
+    allowInsecureImages: true
+
+# -- Image override
+image:
+  registry: docker.io
+  repository: bitnamilegacy/rabbitmq
+
+volumePermissions:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/os-shell
+
+# -- Authentication
+# The Bitnami chart creates the RabbitMQ user using the password from the
+# rabbitmq-credentials K8s Secret (created manually, gitignored templates
+# live in kubernetes/secrets/). A separate rabbitmq-app-credentials secret
+# exposes the same password as RABBITMQ_USERNAME/RABBITMQ_PASSWORD env vars
+# for app consumption. Both secrets must use the same password.
+# See kubernetes/secrets/rabbitmq-credentials.yaml and
+#     kubernetes/secrets/rabbitmq-app-credentials.yaml for templates.
+auth:
+  username: creatium-prod-admin
+  existingPasswordSecret: rabbitmq-credentials
+  existingErlangCookieSecret: rabbitmq-credentials
+
+# -- Persistence (survive pod restarts)
+persistence:
+  enabled: true
+  storageClass: linode-block-storage
+  size: 10Gi
+
+# -- Resources (single-node, general pool)
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# -- Disable secret checksum annotation to prevent unnecessary restarts.
+# If you rotate the RabbitMQ password, manually restart: kubectl delete pod rabbitmq-0 -n production
+podAnnotations:
+  checksum/secret: "static"
+
+# -- Node placement
+nodeSelector:
+  pool: general
+
+# -- Probes (give RabbitMQ time to initialize on first boot)
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 20
+  failureThreshold: 6
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 20
+  failureThreshold: 3
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# -- Plugins
+communityPlugins: ""
+extraPlugins: "rabbitmq_management rabbitmq_prometheus"
+
+# -- Management UI (exposed via nip.io ingress, see management-ingress.yaml)
+service:
+  type: ClusterIP
+
+# -- Prometheus metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: production
+    interval: 30s
+    labels:
+      prometheus: kube-prometheus
+      role: alert-rules
+
+# -- Single replica is acceptable for current SLA requirements.
+# RabbitMQ data survives pod restarts via persistent storage (10Gi PVC).
+# For HA, scale to 3 replicas with quorum queues and add a PodDisruptionBudget.
+# Revisit when message throughput or uptime SLA increases.
+replicaCount: 1
+
+# -- Priority queue support + least-privilege permissions
+extraConfiguration: |-
+  default_vhost = /
+  default_permissions.configure = .*
+  default_permissions.read = .*
+  default_permissions.write = .*

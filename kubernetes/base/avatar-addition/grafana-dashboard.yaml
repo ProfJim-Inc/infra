@@ -1,0 +1,204 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: avatar-addition-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  avatar-addition.json: |
+    {
+      "title": "Avatar Addition",
+      "uid": "avatar-addition",
+      "tags": ["avatar", "deployment", "backend", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Request Rate (by endpoint)",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{namespace=\"production\", service=\"avatar-addition\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Error Rate (5xx)",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "error rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{namespace=\"production\", service=\"avatar-addition\", status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total{namespace=\"production\", service=\"avatar-addition\"}[5m]))",
+            "legendFormat": "error rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "Request Duration Percentiles",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{namespace=\"production\", service=\"avatar-addition\"}[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"production\", service=\"avatar-addition\"}[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace=\"production\", service=\"avatar-addition\"}[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Available Pods",
+          "gridPos": { "h": 3, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "green", "value": 1 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"avatar-addition\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        {
+          "id": 5, "type": "stat", "title": "Active Deployments",
+          "gridPos": { "h": 3, "w": 6, "x": 18, "y": 4 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 2 },
+                { "color": "red", "value": 5 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "avatar_addition_active_deployments{namespace=\"production\"}",
+            "legendFormat": "active"
+          }]
+        },
+
+        { "type": "row", "title": "Avatar Deployments", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Deployments Started (rate)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(avatar_addition_deployments_started_total{namespace=\"production\"}[10m]))",
+            "legendFormat": "started/s"
+          }]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "Deployments Completed (by status)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(increase(avatar_addition_deployments_completed_total{namespace=\"production\"}[1h])) by (status)",
+            "legendFormat": "{{ status }}"
+          }]
+        },
+
+        {
+          "id": 12, "type": "piechart", "title": "Deployment Outcomes (24h)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "sum(increase(avatar_addition_deployments_completed_total{namespace=\"production\"}[24h])) by (status)",
+            "legendFormat": "{{ status }}"
+          }]
+        },
+
+        { "type": "row", "title": "Endpoint Latency", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 20, "type": "timeseries", "title": "P95 Latency by Endpoint",
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"production\", service=\"avatar-addition\"}[5m])) by (le, endpoint))",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        {
+          "id": 21, "type": "timeseries", "title": "Request Count by Endpoint",
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{namespace=\"production\", service=\"avatar-addition\"}[2m])) by (endpoint)",
+            "legendFormat": "{{ endpoint }}"
+          }]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "collapsed": false },
+
+        {
+          "id": 30, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"avatar-addition-(?!ui).*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 31, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"avatar-addition-(?!ui).*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 32, "type": "timeseries", "title": "Pod Restarts",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"production\", pod=~\"avatar-addition-(?!ui).*\"}[1h])",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }, "collapsed": false },
+
+        {
+          "id": 40, "type": "logs", "title": "Avatar Addition Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 31 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:avatar-addition* AND NOT kubernetes.pod_name:avatar-addition-ui*",
+            "queryType": "lucene",
+            "timeField": "@timestamp",
+            "metrics": [{ "type": "logs", "id": "1" }]
+          }]
+        }
+      ]
+    }

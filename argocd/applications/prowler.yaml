@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prowler
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+spec:
+  project: creatium
+
+  source:
+    repoURL: https://github.com/ProfJim-Inc/infra.git
+    targetRevision: main
+    path: kubernetes/base/prowler
+    directory:
+      recurse: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

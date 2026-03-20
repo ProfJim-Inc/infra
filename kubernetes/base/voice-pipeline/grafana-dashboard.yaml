@@ -1,0 +1,379 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voice-pipeline-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  voice-pipeline.json: |
+    {
+      "title": "Voice Pipeline",
+      "uid": "voice-pipeline",
+      "tags": ["voice-pipeline", "tts", "production"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+
+        { "type": "row", "title": "Golden Signals", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false },
+
+        {
+          "id": 1, "type": "timeseries", "title": "Jobs Received Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [{
+            "expr": "sum(rate(voice_pipeline_jobs_received_total{pod=~\"voice-pipeline-.*\"}[2m]))",
+            "legendFormat": "jobs/s"
+          }]
+        },
+
+        {
+          "id": 2, "type": "timeseries", "title": "Job Failure Rate",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "failure rate" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "sum(rate(voice_pipeline_jobs_failed_total[5m])) / clamp_min(sum(rate(voice_pipeline_jobs_received_total[5m])), 1e-10)",
+            "legendFormat": "failure rate"
+          }]
+        },
+
+        {
+          "id": 3, "type": "timeseries", "title": "Job Duration Percentiles",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_job_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_job_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(voice_pipeline_job_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        {
+          "id": 4, "type": "stat", "title": "Running Pods",
+          "gridPos": { "h": 6, "w": 3, "x": 18, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 1 },
+                { "color": "green", "value": 2 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=\"voice-pipeline\"})",
+            "legendFormat": "pods"
+          }]
+        },
+
+        {
+          "id": 5, "type": "stat", "title": "Active Jobs",
+          "gridPos": { "h": 6, "w": 3, "x": 21, "y": 1 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": { "steps": [
+                { "color": "green", "value": 0 },
+                { "color": "yellow", "value": 10 },
+                { "color": "red", "value": 20 }
+              ]}
+            }
+          },
+          "targets": [{
+            "expr": "sum(voice_pipeline_active_jobs)",
+            "legendFormat": "active"
+          }]
+        },
+
+        { "type": "row", "title": "TTS Provider Performance", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }, "collapsed": false },
+
+        {
+          "id": 6, "type": "timeseries", "title": "TTS API Latency by Provider (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_tts_duration_seconds_bucket[5m])) by (le, provider))", "legendFormat": "p50 {{ provider }}" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_tts_duration_seconds_bucket[5m])) by (le, provider))", "legendFormat": "p95 {{ provider }}" }
+          ]
+        },
+
+        {
+          "id": 7, "type": "piechart", "title": "Completed Jobs by Provider (1h)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "targets": [{
+            "expr": "sum(increase(voice_pipeline_jobs_completed_total[1h])) by (provider)",
+            "legendFormat": "{{ provider }}"
+          }]
+        },
+
+        {
+          "id": 8, "type": "timeseries", "title": "Generated Audio Duration Distribution",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_audio_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_audio_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        { "type": "row", "title": "Pipeline Stages", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "collapsed": false },
+
+        {
+          "id": 9, "type": "timeseries", "title": "Blob Upload Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_blob_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_blob_upload_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 10, "type": "timeseries", "title": "Word Alignment Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_word_alignment_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_word_alignment_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 11, "type": "timeseries", "title": "Webhook Delivery",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "sum(rate(voice_pipeline_webhook_sent_total{status=\"success\"}[5m]))", "legendFormat": "success/s" },
+            { "expr": "sum(rate(voice_pipeline_webhook_sent_total{status=\"error\"}[5m]))", "legendFormat": "error/s" },
+            { "expr": "sum(rate(voice_pipeline_webhook_failed_total[5m]))", "legendFormat": "exhausted/s" }
+          ]
+        },
+
+        { "type": "row", "title": "Bridge (Azure Queue → RabbitMQ)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "collapsed": false },
+
+        {
+          "id": 12, "type": "timeseries", "title": "Bridge Message Retries",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(voice_pipeline_messages_retried_total[5m])", "legendFormat": "retries/s" },
+            { "expr": "rate(voice_pipeline_messages_dead_lettered_total[5m])", "legendFormat": "dead-lettered/s" }
+          ]
+        },
+
+        {
+          "id": 13, "type": "stat", "title": "Bridge Status",
+          "gridPos": { "h": 7, "w": 4, "x": 8, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+              ]
+            }
+          },
+          "targets": [{
+            "expr": "sum(kube_deployment_status_replicas_available{namespace=\"production\", deployment=~\"voice-pipeline-bridge.*\"})",
+            "legendFormat": "bridge"
+          }]
+        },
+
+        {
+          "id": 14, "type": "stat", "title": "RabbitMQ Connected",
+          "gridPos": { "h": 7, "w": 4, "x": 12, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "DISCONNECTED", "color": "red" }, "1": { "text": "CONNECTED", "color": "green" } } }
+              ]
+            }
+          },
+          "targets": [{
+            "expr": "min(voice_pipeline_rabbitmq_connected)",
+            "legendFormat": "status"
+          }]
+        },
+
+        {
+          "id": 15, "type": "timeseries", "title": "Dead Lettered Messages (cumulative 15m)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 24 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" },
+            "overrides": [{ "matcher": { "id": "byName", "options": "dead-lettered" },
+              "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }]
+          },
+          "targets": [{
+            "expr": "increase(voice_pipeline_messages_dead_lettered_total[15m])",
+            "legendFormat": "dead-lettered"
+          }]
+        },
+
+        { "type": "row", "title": "Infrastructure", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }, "collapsed": false },
+
+        {
+          "id": 16, "type": "timeseries", "title": "CPU Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"voice-pipeline-[^b].*\", container!=\"\"}[2m])) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 17, "type": "timeseries", "title": "Memory Usage",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"production\", pod=~\"voice-pipeline-[^b].*\", container!=\"\"}) by (pod)",
+            "legendFormat": "{{ pod }}"
+          }]
+        },
+
+        {
+          "id": 18, "type": "timeseries", "title": "Text Input Length (p50/p95)",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 32 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "displayName": "chars" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_text_length_chars_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_text_length_chars_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        { "type": "row", "title": "ElevenLabs Pipeline Breakdown", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 }, "collapsed": false },
+
+        {
+          "id": 20, "type": "timeseries", "title": "Voice Lookup Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_voice_lookup_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_voice_lookup_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 21, "type": "timeseries", "title": "ElevenLabs HTTP Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_elevenlabs_http_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_elevenlabs_http_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 22, "type": "timeseries", "title": "Audio Save Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 39 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_audio_save_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_audio_save_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 23, "type": "timeseries", "title": "Timing Conversion Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_timing_conversion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_timing_conversion_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 24, "type": "timeseries", "title": "Generated Audio Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_audio_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_audio_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 25, "type": "timeseries", "title": "Word Alignment Duration (p50/p95)",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 46 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(voice_pipeline_word_alignment_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(voice_pipeline_word_alignment_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+          ]
+        },
+
+        {
+          "id": 26, "type": "timeseries", "title": "Voices Cache Hit/Miss Rate",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 53 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "targets": [
+            { "expr": "rate(voice_pipeline_voices_cache_total{result=\"hit\"}[5m])", "legendFormat": "hits/s" },
+            { "expr": "rate(voice_pipeline_voices_cache_total{result=\"miss\"}[5m])", "legendFormat": "misses/s" },
+            { "expr": "rate(voice_pipeline_voices_cache_total{result=\"stale\"}[5m])", "legendFormat": "stale/s" }
+          ]
+        },
+
+        {
+          "id": 27, "type": "stat", "title": "Voices Cache Age",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 53 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1800}, {"color": "red", "value": 3600}] } } },
+          "targets": [
+            { "expr": "voice_pipeline_voices_cache_age_seconds", "legendFormat": "cache age" }
+          ]
+        },
+
+        {
+          "id": 28, "type": "stat", "title": "Voices Cached",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 53 },
+          "datasource": { "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}] } } },
+          "targets": [
+            { "expr": "voice_pipeline_voices_cache_size", "legendFormat": "voices" }
+          ]
+        },
+
+        { "type": "row", "title": "Logs", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 }, "collapsed": false },
+
+        {
+          "id": 19, "type": "logs", "title": "Voice Pipeline Logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 61 },
+          "datasource": { "uid": "opensearch" },
+          "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showTime": true, "wrapLogMessage": false },
+          "targets": [{
+            "query": "kubernetes.namespace_name:production AND kubernetes.pod_name:voice-pipeline*",
+            "queryType": "lucene",
+            "format": "logs",
+            "timeField": "@timestamp",
+            "metrics": [{ "type": "logs", "id": "1" }]
+          }]
+        }
+      ]
+    }

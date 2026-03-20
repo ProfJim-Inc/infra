@@ -72,6 +72,9 @@ spec:
     metadata:
       labels:
         {{- include "creatium-service.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       # The pod uses a dedicated ServiceAccount so it can have specific RBAC permissions.
       # Required for Workload Identity (GCP) or IRSA (AWS) if the service needs
@@ -108,6 +111,15 @@ spec:
           # Always: always pull (useful for 'latest' tags in dev — avoid in production).
           # Never: only use the local cache (useful for air-gapped environments).
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
           ports:
             # Named port "http" — referenced by the Service and health probes below.
@@ -254,6 +266,11 @@ spec:
           # Combined with terminationGracePeriodSeconds, the pod has:
           #   5s (preStop sleep) + up to (terminationGracePeriodSeconds - 5)s for cleanup.
           # -----------------------------------------------------------------------
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
           lifecycle:
             preStop:
               exec:
@@ -268,6 +285,11 @@ spec:
       #     pool: compute    ← for ML workloads
       #     pool: gpu        ← for GPU workloads (also needs a toleration)
       # -----------------------------------------------------------------------
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -1,0 +1,94 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: avatar-addition
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: avatar-addition
+spec:
+  groups:
+    - name: avatar-addition.availability
+      interval: 30s
+      rules:
+
+        - alert: AvatarAdditionDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment="avatar-addition"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: avatar-addition
+            namespace: production
+          annotations:
+            summary: "avatar-addition has no running pods"
+            description: >-
+              All avatar-addition replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/avatar-addition -n production"
+
+        - alert: AvatarAdditionPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"avatar-addition-(?!ui).*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: avatar-addition
+            namespace: production
+          annotations:
+            summary: "avatar-addition pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} (container: {{ $labels.container }}) has
+              restarted {{ $value | printf "%.0f" }} times in the last 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: avatar-addition.slos
+      interval: 30s
+      rules:
+
+        - alert: AvatarAdditionHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", service="avatar-addition", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", service="avatar-addition"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: avatar-addition
+            namespace: production
+          annotations:
+            summary: "avatar-addition HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx
+              over the last 5 minutes.
+
+        - alert: AvatarAdditionHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production", service="avatar-addition"}[5m])
+              ) by (le, handler)
+            ) > 5.0
+          for: 5m
+          labels:
+            severity: warning
+            service: avatar-addition
+            namespace: production
+          annotations:
+            summary: "avatar-addition P99 latency above 5 seconds"
+            description: >-
+              P99 latency for handler {{ $labels.handler }} is
+              {{ $value | humanizeDuration }} over the last 5 minutes.

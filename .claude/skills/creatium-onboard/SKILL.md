@@ -6,7 +6,9 @@ You are an SRE engineer at Creatium helping onboard an application repository on
 
 ## What the Creatium stack provides (you don't need to set these up)
 
-- **Kubernetes cluster**: Linode LKE, `us-ord` region, namespace `production`
+- **Kubernetes clusters**: Linode LKE, `us-ord` region
+  - **Production cluster** (`creatium-us`): namespace `production` — full node pool set including GPU
+  - **Staging cluster** (`creatium-us-stage`): namespace `staging` — same pools as production minus GPU, with smaller autoscaler limits
 - **ArgoCD**: GitOps controller that auto-syncs from this infra repo's `main` branch
 - **Shared Helm chart**: `kubernetes/charts/creatium-service/` — all services use this same chart, only overriding values per-service
 - **OTeL Collector**: `http://otel-collector.monitoring.svc.cluster.local:4317` (gRPC) — accepts traces, forwards to Grafana Tempo
@@ -18,6 +20,7 @@ You are an SRE engineer at Creatium helping onboard an application repository on
 
 ## Node pools available
 
+### Production cluster (`creatium-us`)
 | Pool | Instance | Use case | nodeSelector |
 |------|----------|----------|--------------|
 | `general` | g6-standard-4 (4 vCPU / 8 GB) | APIs, web services, workers | `pool: general` |
@@ -25,18 +28,28 @@ You are an SRE engineer at Creatium helping onboard an application repository on
 | `gpu` | g2-gpu-rtx4000a1-m | GPU inference (TTS, etc.) | `pool: gpu` + toleration |
 | `system` | g6-standard-2 (2 vCPU / 4 GB) | Ops stack only, do not use | `pool: system` |
 
+### Staging cluster (`creatium-us-stage`)
+| Pool | Instance | Use case | nodeSelector |
+|------|----------|----------|--------------|
+| `general` | g6-standard-4 (4 vCPU / 8 GB) | APIs, web services, workers | `pool: general` |
+| `compute` | g6-dedicated-8 (8 vCPU / 16 GB) | CPU-intensive ML inference | `pool: compute` |
+| `system` | g6-standard-2 (2 vCPU / 4 GB) | Ops stack only, do not use | `pool: system` |
+
+**Note:** Staging has NO GPU pool. Services that require GPU (e.g., tts-microservice) cannot be deployed to staging.
+
 ---
 
-## Workflow: Six phases in order
+## Workflow: Seven phases in order
 
 ```
-Phase 1: Discover    → Understand what this service is and how it works
-Phase 2: Audit       → Identify what's missing for Creatium compatibility
-Phase 3: Generate    → Create all required infra files
-Phase 4: Metrics &   → Discover, consult, and generate custom metrics + spans
+Phase 1: Discover       → Understand what this service is and how it works
+Phase 2: Audit          → Identify what's missing for Creatium compatibility
+Phase 3: Environment    → Ask which environments to deploy to (prod, stage, or both)
+Phase 4: Generate       → Create all required infra files for each selected environment
+Phase 5: Metrics &      → Discover, consult, and generate custom metrics + spans
          Spans
-Phase 5: Code fixes  → Provide all remaining code changes needed in the app repo
-Phase 6: Dashboard   → Generate a Grafana dashboard showing service health
+Phase 6: Code fixes     → Provide all remaining code changes needed in the app repo
+Phase 7: Dashboard      → Generate a Grafana dashboard showing service health
 ```
 
 ---
@@ -152,11 +165,47 @@ Present findings grouped by severity:
 
 ---
 
-## Phase 3: Generate Creatium Infra Files
+## Phase 3: Environment Selection
 
-Generate ALL of the following. Do not skip any unless there is a specific reason.
+After the audit, ask the user which environment(s) this service should be deployed to:
 
-### 3.1 `kubernetes/base/<service-name>/values.yaml`
+> "Which environment(s) should this service be deployed to?
+> - **production** — full resources, HA replicas, semver-based deploys
+> - **staging** — reduced resources, single replica min, SHA-based deploys for rapid iteration
+> - **both** (recommended) — staging for pre-production validation, production for live traffic
+>
+> Note: GPU services (pool: gpu) can only be deployed to production — the staging cluster has no GPU pool."
+
+**Wait for the user's response before proceeding.**
+
+Based on the user's choice, Phase 4 generates files for the selected environment(s). The key differences between environments:
+
+| Aspect | Production | Staging |
+|--------|-----------|---------|
+| Namespace | `production` | `staging` |
+| Values path | `kubernetes/base/<service>/values.yaml` | `kubernetes/base/<service>/values-stage.yaml` |
+| ArgoCD app path | `argocd/applications/<service>.yaml` | `argocd/applications/<service>-stage.yaml` |
+| ArgoCD destination cluster | `https://kubernetes.default.svc` | Staging cluster server URL (from kubeconfig) |
+| Min replicas | 2 (HA) | 1 (cost savings) |
+| Max replicas | 8 | 4 |
+| CPU requests | Full (e.g., 250m) | Halved (e.g., 100m) |
+| Memory requests | Full (e.g., 512Mi) | Halved (e.g., 256Mi) |
+| Image update strategy | semver tags (ArgoCD Image Updater) | SHA tags (CI pushes on every merge) |
+| Ingress host | `<sub>.creatium.com` | `<sub>.stage.creatium.com` |
+| ENV config value | `production` | `staging` |
+| LOG_LEVEL | `INFO` | `DEBUG` |
+
+---
+
+## Phase 4: Generate Creatium Infra Files
+
+Generate files for each environment selected in Phase 3. If "both" was selected, generate both production AND staging variants. Do not skip any unless there is a specific reason.
+
+**File naming convention:**
+- Production: `values.yaml`, `<service-name>.yaml`
+- Staging: `values-stage.yaml`, `<service-name>-stage.yaml`
+
+### 4.1 `kubernetes/base/<service-name>/values.yaml` (Production)
 
 This file overrides the shared chart defaults for this specific service. Only include keys that differ from the chart defaults (see `kubernetes/charts/creatium-service/values.yaml`).
 
@@ -249,13 +298,32 @@ secretRefs: []
   #   key: <ENV_VAR_NAME>
 ```
 
-**Resource sizing guidance:**
+**Resource sizing guidance (production):**
 - API / web service (general pool): `cpu: 100m/500m`, `memory: 128Mi/512Mi`
 - Background worker: `cpu: 250m/1000m`, `memory: 256Mi/1Gi`
 - ML inference (compute pool): `cpu: 500m/4000m`, `memory: 1Gi/8Gi`
 - GPU service: `cpu: 1000m/4000m`, `memory: 4Gi/16Gi`
 
-### 3.2 `argocd/applications/<service-name>.yaml`
+### 4.1.1 `kubernetes/base/<service-name>/values-stage.yaml` (Staging)
+
+If staging was selected, generate a staging values file alongside the production one. This file follows the same structure but with reduced resources and staging-specific config:
+
+Key differences from production values:
+- `nameOverride: <service-name>` (same — service name doesn't change)
+- `image.tag`: use `"latest"` — CI will overwrite with Git SHA on every merge
+- `autoscaling.minReplicas: 1` (staging doesn't need HA)
+- `autoscaling.maxReplicas: 4` (cap lower for cost)
+- CPU requests halved (e.g., `100m` instead of `250m`)
+- Memory requests halved (e.g., `256Mi` instead of `512Mi`)
+- CPU/memory limits same as production (allow bursting to same ceiling)
+- `ingress.host: <subdomain>.stage.creatium.com`
+- `ingress.tls[0].secretName: <service-name>-stage-tls`
+- `config.ENV: "staging"`
+- `config.LOG_LEVEL: "DEBUG"`
+- All other config values (OTLP_ENDPOINT, SERVICE_NAME, etc.) stay the same
+- `secretRefs`: same secret names — the staging cluster needs its own copies of these K8s Secrets
+
+### 4.2 `argocd/applications/<service-name>.yaml` (Production)
 
 Use the multi-source pattern. Always include all three sources:
 
@@ -324,7 +392,76 @@ spec:
 kubectl apply -f argocd/applications/<service-name>.yaml
 ```
 
-### 3.3 `kubernetes/base/<service-name>/alerts.yaml`
+### 4.2.1 `argocd/applications/<service-name>-stage.yaml` (Staging)
+
+If staging was selected, generate a staging ArgoCD application. Key differences from production:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: <service-name>-stage
+  namespace: argocd
+  labels:
+    team: <team>
+    tier: <tier>
+    environment: staging
+  # NOTE: Staging does NOT use ArgoCD Image Updater annotations.
+  # Staging images are updated by CI via Git SHA writeback to values-stage.yaml.
+spec:
+  project: creatium
+
+  sources:
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/charts/creatium-service
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/<service-name>/values-stage.yaml
+
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      path: kubernetes/base/<service-name>
+      directory:
+        include: "{alerts,alertmanager-config}.yaml"
+
+  destination:
+    server: <staging-cluster-server-url>   # get from staging kubeconfig
+    namespace: staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+```
+
+**Key differences from production ArgoCD app:**
+- `metadata.name`: suffixed with `-stage`
+- `metadata.labels.environment: staging`
+- **No ArgoCD Image Updater annotations** — staging uses CI-driven SHA updates
+- `helm.valueFiles`: points to `values-stage.yaml` instead of `values.yaml`
+- `destination.namespace: staging` (not `production`)
+- `destination.server`: points to the staging cluster (if using a separate cluster) or `https://kubernetes.default.svc` (if staging is a namespace in the same cluster)
+
+Apply manually to the staging cluster:
+```bash
+kubectl apply -f argocd/applications/<service-name>-stage.yaml
+```
+
+### 4.3 `kubernetes/base/<service-name>/alerts.yaml`
 
 Generate a PrometheusRule with at minimum these four alert patterns (adapted to the service name):
 
@@ -420,7 +557,7 @@ spec:
               P99 latency for handler {{ $labels.handler }} is {{ $value | humanizeDuration }}.
 ```
 
-### 3.4 `kubernetes/base/<service-name>/alertmanager-config.yaml`
+### 4.4 `kubernetes/base/<service-name>/alertmanager-config.yaml`
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1alpha1
@@ -496,7 +633,7 @@ kubectl create secret generic alertmanager-slack-secret \
   --from-literal=webhook_url=https://hooks.slack.com/services/XXXXX/YYYYY/ZZZZZ
 ```
 
-### 3.5 `.github/workflows/<service-name>.yml` (in the **app repo**, not this infra repo)
+### 4.5 `.github/workflows/<service-name>.yml` (in the **app repo**, not this infra repo)
 
 Generate this CI/CD workflow for the application repository. It must follow the GitOps pattern: CI builds and pushes the image, then commits the new tag into the infra repo's `values.yaml` so ArgoCD picks it up.
 
@@ -610,15 +747,42 @@ jobs:
 
 **Alternative**: If the app lives in the same monorepo as the infra (like `demo-service`), use the simpler pattern from `demo-service.yml` where CI directly modifies the values file in the same checkout.
 
+### 4.5.1 Staging CI/CD additions
+
+If staging was selected, the CI/CD workflow above needs an additional step that updates the **staging** values file with the Git SHA on every merge to `main`. Add this step right after the production image tag update step:
+
+```yaml
+      # GitOps: update staging image tag (SHA-based, deploys on every merge)
+      - name: Update staging image tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.INFRA_DEPLOY_TOKEN }}
+        run: |
+          SHORT_SHA="${SHA::7}"
+          # Re-use the infra checkout from the previous step if it exists
+          cd /tmp/infra
+          git pull origin main
+          sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
+            kubernetes/base/<service-name>/values-stage.yaml
+          git add kubernetes/base/<service-name>/values-stage.yaml
+          git commit -m "chore: update <service-name> staging image tag to ${SHORT_SHA} [skip ci]"
+          git push
+```
+
+**Staging deployment flow:** Every merge to `main` updates the staging values file with the Git SHA → ArgoCD auto-syncs the staging app → staging always runs the latest `main` code.
+
+**Production deployment flow:** Production uses ArgoCD Image Updater with semver strategy. To promote to production, push a Git tag (e.g., `v1.2.3`). The CI builds and pushes the image with that tag, Image Updater detects the new semver tag and updates the production `values.yaml` automatically.
+
 ---
 
-## Phase 4: Metrics & Spans Consultation
+## Phase 5: Metrics & Spans Consultation
 
 This phase has three steps: **discover** what's worth instrumenting from the code, **consult** the user on what they want, then **generate** the instrumentation code.
 
 Do not skip this phase. Auto-instrumentation (HTTP request counts, latency) is baseline — this phase adds the business-level signal that makes dashboards and alerts actually useful.
 
-### Step 4.1: Discover instrumentation opportunities
+### Step 5.1: Discover instrumentation opportunities
 
 From your Phase 1 code reading, build a categorized list of instrumentation candidates. Present it to the user in this format:
 
@@ -664,7 +828,7 @@ From your Phase 1 code reading, build a categorized list of instrumentation cand
 
 ---
 
-### Step 4.2: Ask the user what they want
+### Step 5.2: Ask the user what they want
 
 After presenting the discovery table, explicitly ask:
 
@@ -681,7 +845,7 @@ If the user adds custom metrics not in your list, ask enough follow-up questions
 - What labels/dimensions do you want? (e.g., by user tier, by region, by model version)
 - Where in the code should it be recorded?
 
-### Step 4.3: Generate the instrumentation code
+### Step 5.3: Generate the instrumentation code
 
 Based on the user's selections, generate the actual code changes. Write complete, paste-ready code — not pseudocode.
 
@@ -805,7 +969,7 @@ def call_payment_provider(order_id: str, amount: int) -> dict:
 
 For Node.js, create a `lib/metrics.js` module following the pattern in `references/nodejs-patterns.md`.
 
-### Step 4.4: Add new alert rules for custom metrics
+### Step 5.4: Add new alert rules for custom metrics
 
 For each business metric the user chose to implement, add corresponding alert rules to `kubernetes/base/<service-name>/alerts.yaml`. Examples:
 
@@ -849,17 +1013,17 @@ Only generate alert rules for metrics the user chose to implement. Match the met
 
 ---
 
-## Phase 5: Code Changes Required in the App Repo
+## Phase 6: Code Changes Required in the App Repo
 
 After generating all the infra files and the metrics/spans code, list the remaining changes needed in the application repository. Be specific — show the actual code, not just descriptions.
 
-### 5.1 Health endpoints
+### 6.1 Health endpoints
 
 If missing, show the exact code to add for the detected framework. See `references/python-patterns.md` and `references/nodejs-patterns.md` for ready-to-paste implementations.
 
 Key requirement: the health endpoint path must match what you put in `values.yaml` under `probes.liveness.path` and `probes.readiness.path`.
 
-### 5.2 Structured JSON logging with OTeL trace injection
+### 6.2 Structured JSON logging with OTeL trace injection
 
 For Python services, show how to add `services/demo-service/app/logging_config.py` to the app. The key requirement is:
 1. JSON output (not plain text)
@@ -868,7 +1032,7 @@ For Python services, show how to add `services/demo-service/app/logging_config.p
 
 For Node.js services, use `pino` with JSON output and `@opentelemetry/api` for span context injection.
 
-### 5.3 OTeL tracing setup
+### 6.3 OTeL tracing setup
 
 For Python/FastAPI, show how to add `services/demo-service/app/telemetry.py` to the app. Key requirements:
 1. `setup_tracing()` called in the FastAPI lifespan handler
@@ -882,7 +1046,7 @@ opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-instrumentation-fastapi
 ```
 
-### 5.4 Prometheus metrics endpoint
+### 6.4 Prometheus metrics endpoint
 
 For Python/FastAPI, show:
 ```python
@@ -892,7 +1056,7 @@ Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 Add to `requirements.txt`: `prometheus-fastapi-instrumentator`
 
-### 5.5 Dockerfile (if missing or needs improvement)
+### 6.5 Dockerfile (if missing or needs improvement)
 
 Generate a production-ready Dockerfile following the pattern in the relevant reference file. Requirements:
 - Multi-stage build (builder + runtime stages)
@@ -921,7 +1085,7 @@ node_modules
 Present a checklist of manual steps the user must take **after** adding the generated files to the infra repo:
 
 ```
-Post-generation checklist:
+Post-generation checklist (Production):
 □ 1. Copy the generated files into the correct paths in ProfJim-Inc/infra
 □ 2. Commit and push to main (ArgoCD syncs automatically for Helm+values changes)
 □ 3. Apply the ArgoCD Application manually:
@@ -939,10 +1103,29 @@ Post-generation checklist:
 □ 6. Create any app-specific Kubernetes Secrets referenced in secretRefs
 □ 7. Add the INFRA_DEPLOY_TOKEN secret to the app repo's GitHub settings
 □ 8. Add the code changes (health endpoints, logging, OTeL) to the app repo
-□ 9. Push a tagged release to trigger the first image build and deployment
+□ 9. Push a tagged release (e.g., v1.0.0) to trigger the first production deployment
 □ 10. Verify in ArgoCD UI that the application syncs successfully
 □ 11. Point DNS for <subdomain>.creatium.com to the NodeBalancer IP
       (get it with: kubectl get svc -n ingress-nginx)
+```
+
+If staging was selected, also present:
+
+```
+Post-generation checklist (Staging):
+□ 1. Apply the staging ArgoCD Application to the staging cluster:
+     KUBECONFIG=<staging-kubeconfig> kubectl apply -f argocd/applications/<service-name>-stage.yaml
+□ 2. Create the GHCR pull secret in the staging namespace:
+     KUBECONFIG=<staging-kubeconfig> kubectl create secret docker-registry ghcr-pull-secret \
+       -n staging \
+       --docker-server=ghcr.io \
+       --docker-username=<github-username> \
+       --docker-password=<github-pat>
+□ 3. Create any app-specific Kubernetes Secrets in the staging cluster
+     (same secret names as production, but can use test/sandbox credentials)
+□ 4. Push to main — CI will build, push the SHA-tagged image, and update values-stage.yaml
+□ 5. Verify staging deployment syncs in ArgoCD
+□ 6. Point DNS for <subdomain>.stage.creatium.com to the staging NodeBalancer IP
 ```
 
 ---

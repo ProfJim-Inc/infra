@@ -1,0 +1,422 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentinel-backend-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  sentinel-backend.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "title": "Overview",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.05 }
+                ]
+              },
+              "unit": "percentunit"
+            }
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "id": 1,
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "title": "HTTP Error Rate (5xx)",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+              "legendFormat": "Error Rate"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "id": 2,
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "title": "HTTP P99 Latency",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "P99"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" }
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "id": 3,
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "title": "Request Rate",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[5m]))",
+              "legendFormat": "req/s"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "id": 4,
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "title": "Active Providers",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "sentinel_active_providers",
+              "legendFormat": "Providers"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "id": 5,
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "title": "Active Report Schedules",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "sentinel_scheduled_reports_active",
+              "legendFormat": "Schedules"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 3600 },
+                  { "color": "red", "value": 7200 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "id": 6,
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "title": "Time Since Last Refresh",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "time() - sentinel_cost_refresh_last_success_timestamp",
+              "legendFormat": "Age"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "id": 101,
+          "title": "HTTP Traffic",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "reqps" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "id": 10,
+          "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+          "title": "Request Rate by Handler",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[5m])) by (handler)",
+              "legendFormat": "{{ handler }}"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "id": 11,
+          "title": "Response Latency (P50 / P95 / P99)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "P50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "P95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "P99"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "id": 102,
+          "title": "Cost Provider Fetching",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+          "id": 20,
+          "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+          "title": "Provider Fetch Duration",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(sentinel_provider_fetch_duration_seconds_sum[5m]) / rate(sentinel_provider_fetch_duration_seconds_count[5m])",
+              "legendFormat": "{{ provider }}"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+          "id": 21,
+          "title": "Provider Fetch Success vs Errors",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(sentinel_provider_fetch_total[5m])) by (provider)",
+              "legendFormat": "{{ provider }} success"
+            },
+            {
+              "expr": "sum(rate(sentinel_provider_fetch_errors_total[5m])) by (provider)",
+              "legendFormat": "{{ provider }} errors"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "id": 22,
+          "title": "Cost Records Upserted",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(sentinel_cost_records_upserted_total[5m])) by (provider)",
+              "legendFormat": "{{ provider }}"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "id": 23,
+          "title": "Cost Alerts Created",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(increase(sentinel_cost_alerts_created_total[1h])) by (alert_type)",
+              "legendFormat": "{{ alert_type }}"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+          "id": 103,
+          "title": "Reports & Emails",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+          "id": 30,
+          "title": "Report Generation Duration",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(sentinel_report_generation_duration_seconds_sum[5m]) / rate(sentinel_report_generation_duration_seconds_count[5m])",
+              "legendFormat": "{{ report_type }}"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "ops" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+          "id": 31,
+          "title": "Emails Sent vs Failed",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum(rate(sentinel_emails_sent_total[5m])) by (type)",
+              "legendFormat": "sent ({{ type }})"
+            },
+            {
+              "expr": "sum(rate(sentinel_emails_failed_total[5m])) by (type)",
+              "legendFormat": "failed ({{ type }})"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+          "id": 104,
+          "title": "Dashboard & MongoDB Performance",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+          "id": 40,
+          "title": "Dashboard Query Duration",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(sentinel_dashboard_query_duration_seconds_sum[5m]) / rate(sentinel_dashboard_query_duration_seconds_count[5m])",
+              "legendFormat": "avg"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(sentinel_dashboard_query_duration_seconds_bucket[5m]))",
+              "legendFormat": "P95"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+          "id": 41,
+          "title": "MongoDB Query Duration by Operation",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(sentinel_mongodb_query_duration_seconds_sum[5m]) / rate(sentinel_mongodb_query_duration_seconds_count[5m])",
+              "legendFormat": "{{ operation }}"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
+          "id": 42,
+          "title": "AWS Optimization Duration",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(sentinel_aws_optimization_duration_seconds_sum[5m]) / rate(sentinel_aws_optimization_duration_seconds_count[5m])",
+              "legendFormat": "avg"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 49 },
+          "id": 43,
+          "title": "SES Email Send Latency",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(sentinel_ses_send_duration_seconds_sum[5m]) / rate(sentinel_ses_send_duration_seconds_count[5m])",
+              "legendFormat": "avg"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(sentinel_ses_send_duration_seconds_bucket[5m]))",
+              "legendFormat": "P95"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 },
+          "id": 105,
+          "title": "Resources",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "percentunit" } },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 58 },
+          "id": 50,
+          "title": "CPU Usage",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"production\", pod=~\"sentinel-backend-.*\"}[5m])",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 58 },
+          "id": 51,
+          "title": "Memory Usage",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{namespace=\"production\", pod=~\"sentinel-backend-.*\"}",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["sentinel", "creatium", "cost-tracking"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Sentinel Backend",
+      "uid": "sentinel-backend",
+      "version": 1
+    }

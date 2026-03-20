@@ -4,7 +4,7 @@ metadata:
   name: creatium
   namespace: argocd
 spec:
-  description: "Creatium production services"
+  description: "Creatium production and staging services"
 
   # Only allow deploying to these namespaces
   destinations:
@@ -30,6 +30,8 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: gpu-operator
       server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
 
   # Only allow deploying from our infra repo and approved Helm charts
   sourceRepos:
@@ -43,7 +45,9 @@ spec:
     - "https://nvidia.github.io/gpu-operator"
     - "https://grafana.github.io/helm-charts"
     - "https://open-telemetry.github.io/opentelemetry-helm-charts"
+    - "https://charts.bitnami.com/bitnami"
     - "https://charts.jetstack.io"
+    - "https://argoproj.github.io/argo-helm"
 
   # Allow these Kubernetes resource types
   clusterResourceWhitelist:

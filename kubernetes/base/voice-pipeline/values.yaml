@@ -1,0 +1,168 @@
+# =============================================================================
+# voice-pipeline — API-based TTS voice generation worker
+# =============================================================================
+nameOverride: voice-pipeline
+
+image:
+  repository: ghcr.io/profjim-inc/creatium-voice-pipeline
+  tag: "98df25d"   # overridden by CI/CD with Git SHA on every merge
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# Health check server listens on 8080; the main process is a queue consumer
+containerPort: 8080
+
+# c6a.2xlarge equivalent: 8 vCPU / 16 GB
+# Compute pool node (g6-dedicated-8): 6 dedicated vCPU / 12 GB
+# Pod gets nearly the full node
+resources:
+  requests:
+    cpu: 1000m        # 1 core
+    memory: 1Gi       # 1 GB
+  limits:
+    cpu: 2000m        # 2 cores
+    memory: 2Gi       # 2 GB
+
+probes:
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Allow in-flight TTS jobs to finish before pod is killed
+terminationGracePeriodSeconds: 60
+
+# HPA disabled — KEDA ScaledObject manages replicas based on RabbitMQ queue depth
+# See keda-scaledobject.yaml for scaling config (min 0, max 5, threshold 10 msgs/pod)
+autoscaling:
+  enabled: false
+
+replicaCount: 1   # fallback when KEDA is not active
+
+# No external traffic — triggered by message queues only
+ingress:
+  enabled: false
+
+nodeSelector:
+  pool: compute
+
+tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "compute"
+    effect: "NoSchedule"
+
+# Ensure each pod lands on a separate compute node (pod takes nearly full node)
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - voice-pipeline
+        topologyKey: kubernetes.io/hostname
+
+commonLabels:
+  team: backend
+  tier: internal
+  cost-center: engineering
+
+serviceMonitor:
+  enabled: true
+  path: /metrics
+
+# Grafana dashboard: auto-provisioned via grafana-dashboard.yaml ConfigMap
+# (deployed by ArgoCD as a raw manifest alongside alerts).
+
+config:
+  ENV: "production"
+  SERVICE_NAME: "voice-pipeline"
+  SERVICE_VERSION: "0.1.0"
+  LOG_LEVEL: "INFO"
+  OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  RABBITMQ_HOST: "rabbitmq.production.svc.cluster.local"
+  RABBITMQ_PORT: "5672"
+  MAX_WORKERS: "30"
+  BATCH_SIZE: "10"
+  TIMEOUT_SECONDS: "300"
+  AZURE_QUEUE_NAME: "creatium-narrateaudio"
+
+# Secrets must be pre-created as K8s Secrets:
+#   kubectl create secret generic voice-pipeline-secrets -n production \
+#     --from-literal=ELEVENLABS_API_KEY=<key> \
+#     --from-literal=AZURE_CONNECTION_STRING=<conn-string> \
+#     --from-literal=AZURE_QUEUE_CONNECTION_STRING=<conn-string>
+#   kubectl create secret generic rabbitmq-app-credentials -n production \
+#     --from-literal=RABBITMQ_USERNAME=creatium \
+#     --from-literal=RABBITMQ_PASSWORD=<password>
+secretRefs:
+  - name: voice-pipeline-secrets
+    key: ELEVENLABS_API_KEY
+  - name: voice-pipeline-secrets
+    key: AZURE_CONNECTION_STRING
+  - name: voice-pipeline-secrets
+    key: AZURE_QUEUE_CONNECTION_STRING
+  - name: rabbitmq-app-credentials
+    key: RABBITMQ_USERNAME
+  - name: rabbitmq-app-credentials
+    key: RABBITMQ_PASSWORD
+  - name: voice-pipeline-secrets
+    key: AZURE_BLOB_CONTAINER
+  - name: voice-pipeline-secrets
+    key: VOICE_INFO_FILE_URL
+  - name: voice-pipeline-secrets
+    key: VOICE_INFO_FILE_URL_QA
+  - name: voice-pipeline-secrets
+    key: SPEECH_MODIFIER_URL
+  - name: voice-pipeline-secrets
+    key: ERROR_LOG_URL_PREFIX
+  - name: voice-pipeline-secrets
+    key: WEBHOOK_API_KEY
+  - name: voice-pipeline-secrets
+    key: CARTESIA_API_KEY
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_HOST
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_INDEX_NAME
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_PASSWORD
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_PORT
+  - name: voice-pipeline-secrets
+    key: CARTESIA_OPENSEARCH_USERNAME
+  - name: voice-pipeline-secrets
+    key: DEBUG
+  - name: voice-pipeline-secrets
+    key: ENVIRONMENT
+  - name: voice-pipeline-secrets
+    key: INWORLD_API_KEY
+  - name: voice-pipeline-secrets
+    key: KOKORO_API_KEY
+  - name: voice-pipeline-secrets
+    key: KOKORO_MANAGER_URL
+  - name: voice-pipeline-secrets
+    key: LOG_FILE_PATH
+  - name: voice-pipeline-secrets
+    key: LOG_FORMAT
+  - name: voice-pipeline-secrets
+    key: LOG_GROUP_NAME

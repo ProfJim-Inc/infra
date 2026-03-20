@@ -84,7 +84,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN cannot push to branch-protected main.
+          # Use a PAT (INFRA_PUSH_TOKEN) with repo write + bypass branch protection.
+          # Fallback to GITHUB_TOKEN if PAT is not set.
+          token: ${{ secrets.INFRA_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: main
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -116,17 +121,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # GitOps: write the new SHA tag into values.yaml so ArgoCD sees the change
-      - name: Update image tag in values.yaml
+      # GitOps: update staging image tag via GitHub API (atomic, no race conditions)
+      # Uses the REST API instead of git push to avoid conflicts with Image Updater
+      # and other workflows that also commit to main
+      - name: Update staging image tag
         env:
+          GH_TOKEN: ${{ secrets.INFRA_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}
         run: |
           SHORT_SHA="${SHA::7}"
-          sed -i "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|" \
-            kubernetes/base/demo-service/values.yaml
+          FILE_PATH="kubernetes/base/demo-service/values-stage.yaml"
+          REPO="${GITHUB_REPOSITORY}"
 
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add kubernetes/base/demo-service/values.yaml
-          git commit -m "chore: update demo-service image tag to ${SHORT_SHA} [skip ci]"
-          git push
+          # Get current file content and SHA from the API
+          RESPONSE=$(gh api "repos/${REPO}/contents/${FILE_PATH}" --jq '{sha: .sha, content: .content}')
+          FILE_SHA=$(echo "$RESPONSE" | jq -r '.sha')
+          CURRENT_CONTENT=$(echo "$RESPONSE" | jq -r '.content' | base64 -d)
+
+          # Replace the tag in the content
+          NEW_CONTENT=$(echo "$CURRENT_CONTENT" | sed "s|tag:.*# overridden.*|tag: \"${SHORT_SHA}\"   # overridden by CI/CD with Git SHA on every merge|")
+
+          # Check if anything actually changed
+          if [ "$CURRENT_CONTENT" = "$NEW_CONTENT" ]; then
+            echo "Tag already set to ${SHORT_SHA}, nothing to update"
+            exit 0
+          fi
+
+          # Push update via API (atomic — handles concurrent writes)
+          NEW_CONTENT_B64=$(echo "$NEW_CONTENT" | base64 -w 0)
+          gh api "repos/${REPO}/contents/${FILE_PATH}" \
+            --method PUT \
+            --field message="chore: update demo-service staging image tag to ${SHORT_SHA} [skip ci]" \
+            --field content="${NEW_CONTENT_B64}" \
+            --field sha="${FILE_SHA}" \
+            --field branch="main"
+
+          echo "Updated ${FILE_PATH} with tag: ${SHORT_SHA}"

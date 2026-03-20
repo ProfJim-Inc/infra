@@ -1,0 +1,56 @@
+# =============================================================================
+# KEDA ScaledObject — voice-pipeline (STAGING)
+# Same as production but in staging namespace with lower max replicas
+# =============================================================================
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: voice-pipeline-rabbitmq-auth
+  namespace: staging
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: voice-pipeline-rabbitmq-connection
+      key: host
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: voice-pipeline
+  namespace: staging
+  labels:
+    app.kubernetes.io/name: voice-pipeline
+    team: backend
+    environment: staging
+spec:
+  scaleTargetRef:
+    name: voice-pipeline
+  minReplicaCount: 0
+  maxReplicaCount: 2                    # staging: lower cap
+  pollingInterval: 15
+  cooldownPeriod: 300
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 120
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: testing-queue
+        mode: QueueLength
+        value: "10"
+      authenticationRef:
+        name: voice-pipeline-rabbitmq-auth

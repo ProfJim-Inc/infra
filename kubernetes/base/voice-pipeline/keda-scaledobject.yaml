@@ -1,0 +1,64 @@
+# =============================================================================
+# KEDA ScaledObject — voice-pipeline
+#
+# Scales voice-pipeline pods based on RabbitMQ queue depth.
+# When messages pile up in the queue, KEDA adds pods to drain them faster.
+# When the queue is empty, KEDA scales down to minReplicaCount.
+#
+# How it works:
+#   1. KEDA polls RabbitMQ's management API for the queue length
+#   2. If queueLength > queueLength threshold, KEDA scales up
+#   3. Each pod processes BATCH_SIZE messages with MAX_WORKERS concurrency
+#   4. cooldownPeriod prevents flapping after a burst is drained
+# =============================================================================
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: voice-pipeline-rabbitmq-auth
+  namespace: production
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: voice-pipeline-rabbitmq-connection
+      key: host
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: voice-pipeline
+  namespace: production
+  labels:
+    app.kubernetes.io/name: voice-pipeline
+    team: backend
+spec:
+  scaleTargetRef:
+    name: voice-pipeline               # must match the Deployment name
+  minReplicaCount: 1                    # always keep at least 1 pod running
+  maxReplicaCount: 5                    # cap — each pod takes ~1 compute node
+  pollingInterval: 15                   # check queue depth every 15s
+  cooldownPeriod: 300                   # wait 5 min after last trigger before scaling down
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+            - type: Pods
+              value: 1                  # add 1 pod at a time (each is expensive)
+              periodSeconds: 60
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 120
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: creatium-narrateaudio        # matches AZURE_QUEUE_NAME in config
+        mode: QueueLength
+        value: "10"                     # scale up when >10 messages per pod
+      authenticationRef:
+        name: voice-pipeline-rabbitmq-auth

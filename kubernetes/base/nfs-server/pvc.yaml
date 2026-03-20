@@ -1,0 +1,15 @@
+# =============================================================================
+# PersistentVolumeClaim — CSI-provisioned Linode Block Storage volume
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: judwaa-nfs-storage
+  namespace: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: linode-block-storage-encrypted-retain
+  resources:
+    requests:
+      storage: 500Gi
