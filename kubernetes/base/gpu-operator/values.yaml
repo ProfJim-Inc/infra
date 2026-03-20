@@ -1,0 +1,53 @@
+# =============================================================================
+# NVIDIA GPU Operator — MPS-enabled GPU sharing for LKE
+# =============================================================================
+# Enables Multi-Process Service (MPS) so multiple pods can share a single GPU
+# with true concurrent CUDA execution (no time-slicing).
+#
+# LKE GPU nodes do NOT have NVIDIA drivers pre-installed.
+# The GPU Operator will install and manage the driver lifecycle.
+
+# -- Driver: enabled — installs NVIDIA drivers on GPU nodes
+driver:
+  enabled: true
+
+# -- Container Toolkit: enables nvidia-container-toolkit for container GPU access
+toolkit:
+  enabled: true
+
+# -- Device Plugin: replaces the standalone nvidia-device-plugin helm chart
+# MPS sharing is configured via the ConfigMap referenced in devicePlugin.config.
+devicePlugin:
+  enabled: true
+  config:
+    create: true
+    name: "mps-config"
+    default: "all"
+
+# -- MPS sharing ConfigMap
+# The "all" key applies to all GPUs. replicas controls how many pods can share
+# each GPU concurrently via MPS.
+mps:
+  config:
+    all: |-
+      version: v1
+      flags:
+        migStrategy: none
+      sharing:
+        mps:
+          resources:
+          - name: nvidia.com/gpu
+            replicas: 4
+
+# -- Node Feature Discovery: auto-detects GPU nodes, no manual nodeSelector needed
+nfd:
+  enabled: true
+
+# -- DaemonSet scheduling: tolerate GPU taint and restrict to GPU pool
+daemonsets:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  nodeSelector:
+    pool: gpu

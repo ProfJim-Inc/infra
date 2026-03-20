@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-gpu-operator
+  namespace: argocd
+  labels:
+    team: platform
+    tier: internal
+spec:
+  project: creatium
+
+  sources:
+    - repoURL: https://nvidia.github.io/gpu-operator
+      chart: gpu-operator
+      targetRevision: "v24.9.2"
+      helm:
+        valueFiles:
+          - $values/kubernetes/base/gpu-operator/values.yaml
+    - repoURL: https://github.com/ProfJim-Inc/infra.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-operator
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
