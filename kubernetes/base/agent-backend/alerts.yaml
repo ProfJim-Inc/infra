@@ -1,0 +1,203 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agent-backend
+  namespace: production
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    app.kubernetes.io/name: agent-backend
+spec:
+  groups:
+    - name: agent-backend.availability
+      interval: 30s
+      rules:
+        - alert: AgentBackendDown
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="production",
+                deployment=~"agent-backend.*"
+              }
+            ) == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: agent-backend
+            namespace: production
+          annotations:
+            summary: "agent-backend has no running pods"
+            description: >-
+              All agent-backend replicas are unavailable for > 1 minute.
+            runbook: "kubectl rollout status deployment/agent-backend -n production"
+
+        - alert: AgentBackendPodCrashLooping
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="production",
+                pod=~"agent-backend-.*"
+              }[15m]
+            ) > 3
+          for: 0m
+          labels:
+            severity: warning
+            service: agent-backend
+            namespace: production
+          annotations:
+            summary: "agent-backend pod {{ $labels.pod }} is crash-looping"
+            description: >-
+              Pod {{ $labels.pod }} has restarted {{ $value | printf "%.0f" }} times in 15 minutes.
+            runbook: "kubectl logs {{ $labels.pod }} -n production --previous"
+
+    - name: agent-backend.slos
+      interval: 30s
+      rules:
+        - alert: AgentBackendHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="production", job="agent-backend", status_code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="production", job="agent-backend"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            service: agent-backend
+            namespace: production
+          annotations:
+            summary: "agent-backend HTTP error rate above 5%"
+            description: >-
+              {{ $value | humanizePercentage }} of requests are returning 5xx over the last 5 minutes.
+
+        - alert: AgentBackendHighLatencyP99
+          expr: |
+            histogram_quantile(
+              0.99,
+              sum(
+                rate(http_request_duration_seconds_bucket{namespace="production", job="agent-backend"}[5m])
+              ) by (le, handler)
+            ) > 5.0
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-backend
+            namespace: production
+          annotations:
+            summary: "agent-backend P99 latency above 5 seconds"
+            description: >-
+              P99 latency for handler {{ $labels.handler }} is {{ $value | humanizeDuration }}.
+
+    - name: agent-backend.business
+      interval: 60s
+      rules:
+        - alert: AgentAvatarPipelineHighFailureRate
+          expr: |
+            (
+              sum(rate(agent_avatar_jobs_failed_total[10m]))
+              /
+              sum(rate(agent_avatar_jobs_created_total[10m]))
+            ) > 0.10
+          for: 5m
+          labels:
+            severity: critical
+            service: agent-backend
+            namespace: production
+          annotations:
+            summary: "agent-backend avatar pipeline failure rate above 10%"
+            description: >-
+              {{ $value | humanizePercentage }} of avatar jobs are failing over the last 10 minutes.
+            runbook: "kubectl logs -l app=agent-worker -n production --tail=100"
+
+        - alert: AgentImageGenerationHighErrorRate
+          expr: |
+            (
+              sum(rate(agent_image_generation_errors_total[10m]))
+              /
+              sum(rate(agent_image_generation_requests_total[10m]))
+            ) > 0.15
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-backend
+            namespace: production
+          annotations:
+            summary: "agent-backend image generation error rate above 15%"
+            description: >-
+              {{ $value | humanizePercentage }} of image generation requests are failing.
+
+    - name: agent-worker.business
+      interval: 60s
+      rules:
+        - alert: AgentAvatarPipelineStuckJobs
+          expr: agent_active_pipeline_jobs > 5
+          for: 10m
+          labels:
+            severity: warning
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "More than 5 avatar pipeline jobs active simultaneously"
+            description: >-
+              {{ $value | printf "%.0f" }} jobs are active. Workers may be stuck or queue is backlogged.
+            runbook: "kubectl logs -l app=agent-worker -n production --tail=200"
+
+        - alert: AgentVideoPendingSegmentsHigh
+          expr: agent_pipeline_pending_video_segments > 20
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "More than 20 video segments waiting for Creatify webhooks"
+            description: >-
+              {{ $value | printf "%.0f" }} segments pending. Creatify webhooks may be delayed or failing.
+
+        - alert: AgentPipelineSlowP95
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(agent_pipeline_duration_seconds_bucket[1h])) by (le)
+            ) > 3600
+          for: 10m
+          labels:
+            severity: warning
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "Avatar pipeline P95 duration exceeds 60 minutes"
+            description: >-
+              95th percentile pipeline duration is {{ $value | humanizeDuration }}.
+              Check Creatify and Cerebrium API status.
+
+        - alert: AgentAudioGenerationSlow
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(agent_audio_generation_duration_seconds_bucket[10m])) by (le, model_id)
+            ) > 30
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-worker
+            namespace: production
+          annotations:
+            summary: "ElevenLabs TTS P95 latency above 30 seconds (model: {{ $labels.model_id }})"
+            description: >-
+              Audio generation P95 is {{ $value | humanizeDuration }} for model {{ $labels.model_id }}.
+              ElevenLabs API may be experiencing issues.
+
+        - alert: AgentCerebriumBgRemovalSlow
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(agent_cerebrium_bg_removal_duration_seconds_bucket[10m])) by (le)
+            ) > 250
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-worker-bg
+            namespace: production
+          annotations:
+            summary: "Cerebrium BG removal P95 approaching timeout threshold"
+            description: >-
+              P95 BG removal duration is {{ $value | humanizeDuration }} (timeout: 300s).
+              Jobs approaching the limit risk timing out.

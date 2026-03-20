@@ -1,9 +1,14 @@
-# agent-frontend — Node.js/Next.js service
+# =============================================================================
+# agent-frontend — Judwaa AI Avatar Pipeline: Next.js SSR frontend
+# =============================================================================
 nameOverride: agent-frontend
 
 image:
   repository: ghcr.io/creatium/agent-frontend
-  tag: "latest"
+  tag: "latest"   # overridden by CI/CD with Git SHA on every merge
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
 
 containerPort: 3000
 
@@ -20,10 +25,24 @@ probes:
     enabled: true
     path: /api/health
     initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
   readiness:
     enabled: true
     path: /api/health
     initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 15
 
 autoscaling:
   enabled: true
@@ -39,6 +58,7 @@ ingress:
   path: /
   tls:
     enabled: true
+    secretName: agent-frontend-tls
 
 nodeSelector:
   pool: general
@@ -48,5 +68,26 @@ commonLabels:
   tier: customer-facing
   cost-center: engineering
 
+# Note: Next.js NEXT_PUBLIC_* vars are baked at build time (CI build-args).
+# Only server-side runtime vars belong here.
+serviceMonitor:
+  enabled: false   # No Prometheus /metrics endpoint on the frontend
+
 config:
-  NEXT_PUBLIC_API_URL: "https://api.creatium.com"
+  # Server-side runtime env vars (not NEXT_PUBLIC_* — those are CI build-args)
+  INTERNAL_API_BASE_URL: "http://agent-backend.production.svc.cluster.local:8000"
+  AZURE_STORAGE_CONTAINER_NAME: "judwaa-automation"
+  AWS_SES_REGION: "us-east-1"
+  SES_FROM_EMAIL: "donotreply@judwaa.com"
+
+secretRefs:
+  # kubectl create secret generic agent-frontend-secrets -n production \
+  #   --from-literal=AZURE_STORAGE_CONNECTION_STRING=... \
+  #   --from-literal=AWS_SES_ACCESS_KEY_ID=... \
+  #   --from-literal=AWS_SES_SECRET_ACCESS_KEY=...
+  - name: agent-frontend-secrets
+    key: AZURE_STORAGE_CONNECTION_STRING
+  - name: agent-frontend-secrets
+    key: AWS_SES_ACCESS_KEY_ID
+  - name: agent-frontend-secrets
+    key: AWS_SES_SECRET_ACCESS_KEY
