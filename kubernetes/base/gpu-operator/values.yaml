@@ -39,9 +39,15 @@ mps:
           - name: nvidia.com/gpu
             replicas: 4
 
-# -- DaemonSet scheduling: tolerate GPU taint on all operator DaemonSets
+# -- Node Feature Discovery: auto-detects GPU nodes, no manual nodeSelector needed
+nfd:
+  enabled: true
+
+# -- DaemonSet scheduling: tolerate GPU taint and restrict to GPU pool
 daemonsets:
   tolerations:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
+  nodeSelector:
+    pool: gpu

@@ -12,7 +12,7 @@ spec:
   sources:
     - repoURL: https://nvidia.github.io/gpu-operator
       chart: gpu-operator
-      targetRevision: "v24.x"
+      targetRevision: "v24.9.2"
       helm:
         valueFiles:
           - $values/kubernetes/base/gpu-operator/values.yaml
